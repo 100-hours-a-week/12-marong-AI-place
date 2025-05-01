@@ -25,39 +25,60 @@ chroma_client = PersistentClient(path="/Users/kimss/Documents/marong/chroma_db",
 
 # 입력 스키마 정의
 class RecommendInput(BaseModel):
-    user_id: str
-    mbti_vector: List[float]
+    id: str
+    eiScore: int
+    snScore: int
+    tfScore: int
+    jpScore: int
     latitude: float
     longitude: float
-    max_distance: float
-    like_foods: List[str] = []
-    dislike_foods: List[str] = []
-    allow_cafe: bool = True
+    likedFoods: List[str] = []
+    dislikedFoods: List[str] = []
 
 # 추천 API 엔드포인트
 @app.post("/recommend/place")
 def recommend_places(input: RecommendInput):
-    recommender = RecommendPlace(
+    food_recommender = RecommendPlace(
         model=mbti_model,
         embedding_model=embedding_model,
-        mbti_vector=input.mbti_vector,
+        mbti_vector=[input.eiScore, input.snScore, input.tfScore, input.jpScore],
         chroma_client=chroma_client,
         review_col_name="review_collection",
         menu_col_name="menu_collection",
-        allow_cafe=input.allow_cafe
+        allow_cafe=False
+        )
+
+    # recommend 메서드 호출
+    food_results = food_recommender.recommend(
+        lat=input.latitude,
+        lng=input.longitude,
+        radius_km=10,
+        like_foods=input.likedFoods,
+        dislike_foods=input.dislikedFoods
+    )
+
+    cafe_recommender = RecommendPlace(
+        model=mbti_model,
+        embedding_model=embedding_model,
+        mbti_vector=[input.eiScore, input.snScore, input.tfScore, input.jpScore],
+        chroma_client=chroma_client,
+        review_col_name="review_collection",
+        menu_col_name="menu_collection",
+        allow_cafe=True
     )
 
     # recommend 메서드 호출
-    results = recommender.recommend(
+    cafe_results = cafe_recommender.recommend(
         lat=input.latitude,
         lng=input.longitude,
-        radius_km=input.max_distance,
-        like_foods=input.like_foods,
-        dislike_foods=input.dislike_foods
+        radius_km=10,
+        like_foods=input.likedFoods,
+        dislike_foods=input.dislikedFoods
     )
 
     return {
-        "user_id": input.user_id,
+        "user_id": input.id,
         "message": "recommend_success",
-        "data": results
+        "food_data": food_results,
+        "cafe_data": cafe_results
     }
