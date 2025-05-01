@@ -49,9 +49,9 @@ pip install -r requirements.txt
 fastapi dev main.py
 ```
 
-3. **API 문서 확인**:
+3. **API 테스트**:
 
-브라우저에서 `http://localhost:8000/docs`에 접속하여 Postman을 통해 API를 테스트할 수 있습니다.
+Postman을 통해 API를 테스트할 수 있습니다.
 
 ## API 예시
 
