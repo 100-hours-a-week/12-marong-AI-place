@@ -1,4 +1,5 @@
 # 12-marong-AI-place
+![435163003-08e222cf-4552-45f6-bb5d-818e7df50890](https://github.com/user-attachments/assets/94d48140-82c6-49bb-90ee-f52801000cf4)
 
 ## 프로젝트 개요
 
