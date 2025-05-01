@@ -30,7 +30,7 @@
 - `average_latlng.py`: 위도와 경도의 평균을 계산합니다.
 - `calculate_score.py`: 추천 점수를 계산하는 로직을 포함합니다.
 - `extract_mbti_keywords.py`: MBTI 관련 키워드를 추출합니다.
-- `get_week_index.py`: 현재 날짜를 기준으로 주차를 계산합니다.
+- `get_week_index.py`: 현재 날짜를 기준으로 회차를 계산합니다.
 - `haversine.py`: 두 지점 간의 거리를 계산하는 함수를 제공합니다.
 - `main.py`: FastAPI를 활용한 서버 실행 파일입니다.
 - `mbti_projector.py`: MBTI 점수를 벡터로 변환하는 기능을 제공합니다.
@@ -46,23 +46,23 @@ pip install -r requirements.txt
 2. **서버 실행**:
 
 ```bash
-uvicorn main:app --reload
+fastapi dev main.py
 ```
 
 3. **API 문서 확인**:
 
-브라우저에서 `http://localhost:8000/docs`에 접속하여 Swagger UI를 통해 API를 테스트할 수 있습니다.
+브라우저에서 `http://localhost:8000/docs`에 접속하여 Postman을 통해 API를 테스트할 수 있습니다.
 
 ## API 예시
 
-### `POST /recommend/pair`
+### `POST /recommend/place`
 
 **Request Body:**
 
 ```json
 {
   "me": {
-    "id": "pepsi",
+    "id": "user_001",
     "eiScore": 20,
     "snScore": 20,
     "tfScore": 30,
@@ -73,7 +73,7 @@ uvicorn main:app --reload
     "dislikedFoods": ["매운 음식"]
   },
   "manitto": {
-    "id": "yeonhee",
+    "id": "manitto_001",
     "eiScore": 50,
     "snScore": 20,
     "tfScore": 20,
@@ -91,7 +91,10 @@ uvicorn main:app --reload
 ```json
 {
   "index": "1회차",
-  "user_id": "pepsi",
+  "user_id_pair": [
+        "user_001",
+        "manitto_001"
+    ],
   "message": "recommend_success",
   "food_data": [...],
   "cafe_data": [...]
