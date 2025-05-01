@@ -114,17 +114,16 @@ class RecommendPlace:
                     "distance": dist,
                     "link": metadata.get("링크", ""),
                     "score": score,
-                    "category": metadata.get("대표카테고리", "미분류"),
-                    "operation_hours": {
-                        "월": metadata.get("월", "정보 없음"),
-                        "화": metadata.get("화", "정보 없음"),
-                        "수": metadata.get("수", "정보 없음"),
-                        "목": metadata.get("목", "정보 없음"),
-                        "금": metadata.get("금", "정보 없음"),
-                        "토": metadata.get("토", "정보 없음"),
-                        "일": metadata.get("일", "정보 없음")
+                    "category": metadata.get("대표카테고리", "미분류")
+                    # "operation_hours": {
+                    #     "월": metadata.get("월", "정보 없음"),
+                    #     "화": metadata.get("화", "정보 없음"),
+                    #     "수": metadata.get("수", "정보 없음"),
+                    #     "목": metadata.get("목", "정보 없음"),
+                    #     "금": metadata.get("금", "정보 없음"),
+                    #     "토": metadata.get("토", "정보 없음"),
+                    #     "일": metadata.get("일", "정보 없음")
                     }
-                }
 
         process_results(review_results, 0.4, "리뷰", self.allow_cafe)
         process_results(menu_results, 0.6, "메뉴", self.allow_cafe)
