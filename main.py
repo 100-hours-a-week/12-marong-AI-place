@@ -9,6 +9,7 @@ from mbti_projector import MBTIProjector
 from chromadb import PersistentClient
 from chromadb.config import Settings
 from datetime import datetime, timedelta
+from get_week_index import GetWeekIndex
 
 # 기준일: 2025년 5월 12일 (월요일)
 base_date = datetime(2025, 5, 12)
@@ -16,13 +17,8 @@ base_date = datetime(2025, 5, 12)
 # 오늘 날짜
 today = datetime.today()
 
-# 회차 계산 함수
-def get_week_index(target_date: datetime, base_date: datetime) -> int:
-    delta_days = (target_date - base_date).days
-    return 1 + (delta_days // 7 + 1 if delta_days >= 0 else 0)  # 기준일 이전이면 0회차
-
 # 오늘의 회차 출력
-week_index = get_week_index(today, base_date)
+week_index = GetWeekIndex(today, base_date).get()
 
 # FastAPI 서버 초기화
 app = FastAPI()
