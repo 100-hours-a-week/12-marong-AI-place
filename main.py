@@ -112,7 +112,7 @@ def recommend_places(input: PairInput):
     )
 
     return {
-        "index": f"{week_index}회차",
+        "index": week_index,
         "user_id_pair": [input.me.id, input.manitto.id],
         "message": "recommend_success",
         "food_data": food_results,
