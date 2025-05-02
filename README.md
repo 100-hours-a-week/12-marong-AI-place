@@ -17,7 +17,7 @@
 
 ```
 12-marong-AI-place/
-├── RecommendPlace.py
+├── recommend_place.py
 ├── average_latlng.py
 ├── calculate_score.py
 ├── extract_mbti_keywords.py
@@ -28,7 +28,7 @@
 └── README.md
 ```
 
-- `RecommendPlace.py`: 추천 시스템의 핵심 로직을 담고 있습니다.
+- `recommend_place.py`: 추천 시스템의 핵심 로직을 담고 있습니다.
 - `average_latlng.py`: 위도와 경도의 평균을 계산합니다.
 - `calculate_score.py`: 추천 점수를 계산하는 로직을 포함합니다.
 - `extract_mbti_keywords.py`: MBTI 관련 키워드를 추출합니다.
