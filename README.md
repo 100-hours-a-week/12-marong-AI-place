@@ -92,14 +92,36 @@ Postman을 통해 API를 테스트할 수 있습니다.
 
 ```json
 {
-  "index": "1회차",
-  "user_id_pair": [
-        "user_001",
-        "manitto_001"
+    "index": 1,
+    "user_id_pair": [
+        "seafoodlover",
+        "landonly"
     ],
-  "message": "recommend_success",
-  "food_data": [...],
-  "cafe_data": [...]
+    "message": "recommend_success",
+    "food_data": [
+        {
+            "name": "비눔",
+            "address": "경기 성남시 분당구 대왕판교로 660 유스페이스1 지하1층 B106호",
+            "rating": 5.0,
+            "distance": 0.7611726549458185,
+            "link": "https://place.map.kakao.com/224825790",
+            "score": 0.6838664493251585,
+            "category": "양식",
+            "operation_hour": "['월, 화, 수, 목, 금: 11:00~24:00', '토: 18:00~24:00', '일: 휴무일']"
+        }
+    ],
+    "cafe_data": [
+        {
+            "name": "마키아티 판교점",
+            "address": "경기 성남시 분당구 대왕판교로 660 유스페이스1 A동 1층 129호",
+            "rating": 5.0,
+            "distance": 0.06639226081065448,
+            "link": "https://place.map.kakao.com/1313606369",
+            "score": 0.9663520224032158,
+            "category": "카페/디저트",
+            "operation_hour": "['월, 화, 수, 목, 금: 08:00~17:00', '토, 일: 휴무일']"
+        }
+    ]
 }
 ```
 
