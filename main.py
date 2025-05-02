@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import List
 from sentence_transformers import SentenceTransformer
-from RecommendPlace import RecommendPlace
+from recommend_place import RecommendPlace
 from mbti_projector import MBTIProjector
 from chromadb import PersistentClient
 from chromadb.config import Settings
