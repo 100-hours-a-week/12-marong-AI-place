@@ -84,7 +84,6 @@ class RecommendPlace:
 
         # 엔트로피 기반 가중치 계산
         weights = self.calculate_entropy_weights(review_df[["rating", "distance", "similarity"]])
-        print("📊 동적 가중치:", weights)
 
         scored = {}
 
@@ -124,7 +123,8 @@ class RecommendPlace:
                         "distance": dist,
                         "link": metadata.get("링크", ""),
                         "score": score,
-                        "category": metadata.get("대표카테고리", "미분류")
+                        "category": metadata.get("대표카테고리", "미분류"),
+                        "operation_hour": metadata.get("영업시간", "")
                     }
 
         process_results(review_results, 0.4, self.allow_cafe, 0.2)
