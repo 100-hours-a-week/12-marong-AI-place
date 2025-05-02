@@ -65,25 +65,25 @@ Postman을 통해 API를 테스트할 수 있습니다.
 {
   "me": {
     "id": "user_001",
-    "eiScore": 20,
-    "snScore": 20,
+    "eiScore": 30,
+    "snScore": 40,
+    "tfScore": 50,
+    "jpScore": 60,
+    "latitude": 37.394726159,
+    "longitude": 127.111209047,
+    "likedFoods": ["회", "초밥"],
+    "dislikedFoods": ["치킨", "고기"]
+  },
+  "manitto": {
+    "id": "manitto_001",
+    "eiScore": 70,
+    "snScore": 10,
     "tfScore": 30,
     "jpScore": 80,
     "latitude": 37.394726159,
     "longitude": 127.111209047,
-    "likedFoods": ["고기"],
-    "dislikedFoods": ["매운 음식"]
-  },
-  "manitto": {
-    "id": "manitto_001",
-    "eiScore": 50,
-    "snScore": 20,
-    "tfScore": 20,
-    "jpScore": 70,
-    "latitude": 37.394726159,
-    "longitude": 127.111209047,
-    "likedFoods": ["고기", "피자"],
-    "dislikedFoods": ["채소"]
+    "likedFoods": ["갈비", "돈까스"],
+    "dislikedFoods": ["굴", "새우"]
   }
 }
 ```
@@ -94,8 +94,8 @@ Postman을 통해 API를 테스트할 수 있습니다.
 {
     "index": 1,
     "user_id_pair": [
-        "seafoodlover",
-        "landonly"
+        "user_001",
+        "manitto_001"
     ],
     "message": "recommend_success",
     "food_data": [
