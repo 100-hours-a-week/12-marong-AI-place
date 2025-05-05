@@ -13,8 +13,8 @@ from average_latlng import AverageLatLng
 import torch
 import math
 
-# 기준일: 2025년 5월 12일 (월요일)
-base_date = datetime(2025, 5, 12)
+# 기준일: 2025년 1월 1일
+base_date = datetime(2025, 1, 1)
 
 # 오늘 날짜
 today = datetime.today()
