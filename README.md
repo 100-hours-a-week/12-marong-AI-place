@@ -57,28 +57,12 @@ Postman을 통해 API를 테스트할 수 있습니다.
 
 ```json
 {
-  "me": {
-    "id": "user_001",
-    "eiScore": 30,
-    "snScore": 40,
-    "tfScore": 50,
-    "jpScore": 60,
-    "latitude": 37.394726159,
-    "longitude": 127.111209047,
-    "likedFoods": ["회", "초밥"],
-    "dislikedFoods": ["치킨", "고기"]
-  },
-  "manitto": {
-    "id": "manitto_001",
-    "eiScore": 70,
-    "snScore": 10,
-    "tfScore": 30,
-    "jpScore": 80,
-    "latitude": 37.394726159,
-    "longitude": 127.111209047,
-    "likedFoods": ["갈비", "돈까스"],
-    "dislikedFoods": ["굴", "새우"]
-  }
+  "me_id": 1,
+  "manitto_id": 2,
+  "me_lat": 37.5665,
+  "me_lng": 126.9780,
+  "manitto_lat": 37.5651,
+  "manitto_lng": 126.9895
 }
 ```
 
@@ -125,4 +109,4 @@ Postman을 통해 API를 테스트할 수 있습니다.
 - MBTI 점수는 `eiScore`, `snScore`, `tfScore`, `jpScore`로 구성되며, 각 점수는 0에서 100 사이의 정수입니다.
 - 위도(`latitude`)와 경도(`longitude`)는 소수점 형태의 실수로 입력받습니다.
 - `likedFoods`와 `dislikedFoods`는 문자열 리스트로 입력받습니다.
-- 장소 추천 결과를 데이터베이스의 PlaceRecommendationSessions, PlaceRecommendations 테이블에 저장합니다.
+- 장소 추천 결과를 데이터베이스의 `PlaceRecommendationSessions`, `PlaceRecommendations` 테이블에 저장합니다.
