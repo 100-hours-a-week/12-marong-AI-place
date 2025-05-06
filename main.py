@@ -10,8 +10,17 @@ from chromadb.config import Settings
 from datetime import datetime, timedelta
 from get_week_index import GetWeekIndex
 from average_latlng import AverageLatLng
-import torch
-import math
+from concurrent.futures import ThreadPoolExecutor
+import torch, math, asyncio
+
+executor = ThreadPoolExecutor()
+
+async def recommend_async(recommender, *args, **kwargs):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        executor,
+        lambda: recommender.recommend(*args, **kwargs)
+    )
 
 # 기준일: 2025년 1월 1일
 base_date = datetime(2025, 1, 1)
@@ -56,7 +65,7 @@ class PairInput(BaseModel):
 
 # 추천 API 엔드포인트
 @app.post("/recommend/place")
-def recommend_places(input: PairInput):
+async def recommend_places(input: PairInput):
     # 평균 벡터 계산
     avg_vector = [
         (input.me.eiScore + input.manitto.eiScore) / 2,
@@ -72,24 +81,15 @@ def recommend_places(input: PairInput):
     # 취향 합치기
     like_foods = list(set(input.me.likedFoods + input.manitto.likedFoods))
     dislike_foods = list(set(input.me.dislikedFoods + input.manitto.dislikedFoods))
-
+    
     food_recommender = RecommendPlace(
-        model=mbti_model,
-        embedding_model=embedding_model,
-        mbti_vector=avg_vector,
-        chroma_client=chroma_client,
-        review_col_name="review_collection",
-        menu_col_name="menu_collection",
-        allow_cafe=False
-        )
-
-    # recommend 메서드 호출
-    food_results = food_recommender.recommend(
-        lat=avg_lat,
-        lng=avg_lng,
-        radius_km=10,
-        like_foods=like_foods,
-        dislike_foods=dislike_foods
+    model=mbti_model,
+    embedding_model=embedding_model,
+    mbti_vector=avg_vector,
+    chroma_client=chroma_client,
+    review_col_name="review_collection",
+    menu_col_name="menu_collection",
+    allow_cafe=False
     )
 
     cafe_recommender = RecommendPlace(
@@ -101,15 +101,26 @@ def recommend_places(input: PairInput):
         menu_col_name="menu_collection",
         allow_cafe=True
     )
-
-    # recommend 메서드 호출
-    cafe_results = cafe_recommender.recommend(
+    
+    food_task = recommend_async(
+        food_recommender,
         lat=avg_lat,
         lng=avg_lng,
         radius_km=10,
         like_foods=like_foods,
         dislike_foods=dislike_foods
     )
+
+    cafe_task = recommend_async(
+        cafe_recommender,
+        lat=avg_lat,
+        lng=avg_lng,
+        radius_km=10,
+        like_foods=like_foods,
+        dislike_foods=dislike_foods
+    )
+
+    food_results, cafe_results = await asyncio.gather(food_task, cafe_task)
 
     return {
         "index": week_index,
