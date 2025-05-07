@@ -9,28 +9,28 @@ class Users(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     email = Column(String(100), nullable=False)
     provider_id = Column(String(100), nullable=False)
-    nickname = Column(String(100), nullable=False)
+    nickname = Column(String(200), nullable=False)
 
 class SurveyMBTI(Base):
-  __tablename__ = "SurveyMBTI"
-  id = Column(BigInteger, primary_key=True)
-  user_id = Column(BigInteger, index=True)
-  ei_score = Column(Integer)
-  sn_score = Column(Integer)
-  tf_score = Column(Integer)
-  jp_score = Column(Integer)
-  
+    __tablename__ = "SurveyMBTI"
+    id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, index=True)
+    ei_score = Column(Integer)
+    sn_score = Column(Integer)
+    tf_score = Column(Integer)
+    jp_score = Column(Integer)
+
 class SurveyLikedFood(Base):
-  __tablename__ = "SurveyLikedFood"
-  id = Column(BigInteger, primary_key=True)
-  user_id = Column(BigInteger, index=True)
-  food_name = Column(String(100))
-  
+    __tablename__ = "SurveyLikedFood"
+    id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, index=True)
+    food_name = Column(String(100))
+
 class SurveyDislikedFood(Base):
-  __tablename__ = "SurveyDislikedFood"
-  id = Column(BigInteger, primary_key=True)
-  user_id = Column(BigInteger, index=True)
-  food_name = Column(String(100))
+    __tablename__ = "SurveyDislikedFood"
+    id = Column(BigInteger, primary_key=True)
+    user_id = Column(BigInteger, index=True)
+    food_name = Column(String(100))
 
 class PlaceRecommendationSessions(Base):
     __tablename__ = "PlaceRecommendationSessions"
@@ -39,9 +39,7 @@ class PlaceRecommendationSessions(Base):
     manitto_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
     week = Column(Integer, nullable=False)
 
-    # 관계 설정 (선택)
     recommendations = relationship("PlaceRecommendations", back_populates="session")
-
 
 class PlaceRecommendations(Base):
     __tablename__ = "PlaceRecommendations"
@@ -51,5 +49,6 @@ class PlaceRecommendations(Base):
     name = Column(String(150), nullable=False)
     category = Column(String(50))
     opening_hours = Column(String(50))
+    address = Column(String(255))
 
     session = relationship("PlaceRecommendationSessions", back_populates="recommendations")
