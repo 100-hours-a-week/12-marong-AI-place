@@ -7,9 +7,6 @@ Base = declarative_base()
 class Users(Base):
     __tablename__ = "Users"
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    email = Column(String(100), nullable=False)
-    provider_id = Column(String(100), nullable=False)
-    nickname = Column(String(200), nullable=False)
 
 class SurveyMBTI(Base):
     __tablename__ = "SurveyMBTI"
