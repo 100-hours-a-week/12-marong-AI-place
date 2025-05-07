@@ -131,19 +131,21 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
     for place in food_results:
         db.add(PlaceRecommendations(
             session_id=session_entry.id,
-            type="restaurant",
+            type="식당",
             name=place['name'],
             category=place.get('category'),
-            opening_hours=place.get('operation_hour')
+            opening_hours=place.get('operation_hour'),
+            address=place.get('address')
         ))
 
     for place in cafe_results:
         db.add(PlaceRecommendations(
             session_id=session_entry.id,
-            type="cafe",
+            type="카페",
             name=place['name'],
             category=place.get('category'),
-            opening_hours=place.get('operation_hour')
+            opening_hours=place.get('operation_hour'),
+            address=place.get('address')
         ))
 
     db.commit()
