@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey
+from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -48,7 +48,7 @@ class PlaceRecommendations(Base):
     type = Column(String(20), nullable=False)  # 'cafe' or 'restaurant'
     name = Column(String(150), nullable=False)
     category = Column(String(50))
-    opening_hours = Column(String(50))
+    opening_hours = Column(Text)
     address = Column(String(255))
 
     session = relationship("PlaceRecommendationSessions", back_populates="recommendations")
