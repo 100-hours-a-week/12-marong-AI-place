@@ -1,4 +1,3 @@
-# ✅ recommend_place.py
 import torch
 import torch.nn.functional as F
 from haversine import haversine
@@ -6,17 +5,25 @@ from extract_mbti_keywords import ExtractMBTIKeywords
 from calculate_score import CalculateScore
 import pandas as pd
 import numpy as np
+from math import tanh
 
 class RecommendPlace:
-    def __init__(self, model, embedding_model, mbti_vector, chroma_client, review_col_name, menu_col_name, allow_cafe=True):
+    def __init__(self, model, embedding_model, mbti_vector, chroma_client,
+                 review_col_name, menu_col_name, allow_cafe=True, embedding_func=None):
         self.model = model.eval()
         self.allow_cafe = allow_cafe
-
         self.embedding_model = embedding_model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.review_collection = chroma_client.get_or_create_collection(name=review_col_name)
-        self.menu_collection = chroma_client.get_or_create_collection(name=menu_col_name)
+        # ✅ embedding_func을 적용해서 컬렉션 초기화
+        self.review_collection = chroma_client.get_or_create_collection(
+            name=review_col_name,
+            embedding_function=None
+        )
+        self.menu_collection = chroma_client.get_or_create_collection(
+            name=menu_col_name,
+            embedding_function=None
+        )
 
         mbti_keywords = ExtractMBTIKeywords().extract(mbti_vector)
         if not mbti_keywords:
@@ -66,10 +73,9 @@ class RecommendPlace:
             include=["metadatas", "distances", "documents"]
         )
 
-        # 엔트로피 기반 가중치 계산을 위한 유사도 기반 DF
         score_rows = []
         for metadata, dist in zip(review_results["metadatas"][0], review_results["distances"][0]):
-            sim = (1 - dist) * 4  # 🎯 유사도 점수 확대
+            sim = (1 - dist) * 4
             score_rows.append({
                 "rating": float(metadata.get("평균별점", 0)),
                 "distance": haversine(lat, lng, metadata.get("위도"), metadata.get("경도")),
@@ -78,11 +84,9 @@ class RecommendPlace:
 
         review_df = pd.DataFrame(score_rows)
 
-        # 🎯 similarity만 정규화 (0~1로 분포 확장)
         review_df["similarity"] = (review_df["similarity"] - review_df["similarity"].min()) / \
-                                (review_df["similarity"].max() - review_df["similarity"].min() + 1e-12)
+                                   (review_df["similarity"].max() - review_df["similarity"].min() + 1e-12)
 
-        # 엔트로피 기반 가중치 계산
         weights = self.calculate_entropy_weights(review_df[["rating", "distance", "similarity"]])
 
         scored = {}
@@ -104,12 +108,7 @@ class RecommendPlace:
                     continue
 
                 dist = haversine(lat, lng, lat_p, lng_p)
-                
-                from math import tanh
-                def adjusted_similarity(distance):
-                    return max(0.0, tanh((1 - distance) * 3))
-                
-                sim_score = adjusted_similarity(distance)
+                sim_score = max(0.0, tanh((1 - distance) * 3))
 
                 score = CalculateScore(rating, dist, sim_score, radius_km, weights).calculate() * weight
 

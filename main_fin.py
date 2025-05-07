@@ -7,7 +7,8 @@ from db_models import SurveyMBTI, SurveyLikedFood, SurveyDislikedFood, PlaceReco
 from sentence_transformers import SentenceTransformer
 from recommend_place import RecommendPlace
 from mbti_projector import MBTIProjector
-from chromadb import PersistentClient
+from chromadb import HttpClient
+from chromadb.utils import embedding_functions
 from chromadb.config import Settings
 from datetime import datetime
 from get_week_index import GetWeekIndex
@@ -34,8 +35,17 @@ app = FastAPI()
 mbti_model = MBTIProjector()
 mbti_model.load_state_dict(torch.load("best_mbti_projector.pt", map_location="cpu"))
 mbti_model.eval()
+
+# 임베딩 모델 및 함수
 embedding_model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")
-chroma_client = PersistentClient(path="/Users/kimss/Documents/marong/chroma_db", settings=Settings(anonymized_telemetry=False))
+embedding_func = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="snunlp/KR-SBERT-V40K-klueNLI-augSTS")
+
+# ChromaDB HttpClient 연결
+chroma_client = HttpClient(
+    host="localhost",
+    port=8002,
+    ssl=False
+)
 
 # 입력 스키마
 class RecommendationRequest(BaseModel):
@@ -92,6 +102,7 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
     like_foods = list(set(me['likedFoods'] + manitto['likedFoods']))
     dislike_foods = list(set(me['dislikedFoods'] + manitto['dislikedFoods']))
 
+    # ✅ embedding_func 전달 추가
     food_recommender = RecommendPlace(
         model=mbti_model,
         embedding_model=embedding_model,
@@ -99,7 +110,8 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
         chroma_client=chroma_client,
         review_col_name="review_collection",
         menu_col_name="menu_collection",
-        allow_cafe=False
+        allow_cafe=False,
+        embedding_func=embedding_func
     )
 
     cafe_recommender = RecommendPlace(
@@ -109,11 +121,14 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
         chroma_client=chroma_client,
         review_col_name="review_collection",
         menu_col_name="menu_collection",
-        allow_cafe=True
+        allow_cafe=True,
+        embedding_func=embedding_func
     )
 
-    food_task = recommend_async(food_recommender, lat=avg_lat, lng=avg_lng, radius_km=10, like_foods=like_foods, dislike_foods=dislike_foods)
-    cafe_task = recommend_async(cafe_recommender, lat=avg_lat, lng=avg_lng, radius_km=10, like_foods=like_foods, dislike_foods=dislike_foods)
+    food_task = recommend_async(food_recommender, lat=avg_lat, lng=avg_lng, radius_km=10,
+                                like_foods=like_foods, dislike_foods=dislike_foods)
+    cafe_task = recommend_async(cafe_recommender, lat=avg_lat, lng=avg_lng, radius_km=10,
+                                like_foods=like_foods, dislike_foods=dislike_foods)
 
     food_results, cafe_results = await asyncio.gather(food_task, cafe_task)
 
@@ -125,7 +140,7 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
     )
     db.add(session_entry)
     db.commit()
-    db.refresh(session_entry)  # 세션 ID 확보
+    db.refresh(session_entry)
 
     # ✅ 장소 추천 저장
     for place in food_results:
