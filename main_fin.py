@@ -23,7 +23,7 @@ async def recommend_async(recommender, *args, **kwargs):
     return await loop.run_in_executor(executor, lambda: recommender.recommend(*args, **kwargs))
 
 # 날짜 기준 주차 계산
-base_date = datetime(2025, 1, 1)
+base_date = datetime(2025, 1, 6)
 today = datetime.today()
 week_index = GetWeekIndex(today, base_date).get()
 
