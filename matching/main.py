@@ -12,7 +12,7 @@ current_week = GetWeekIndex(today, base_date).get()
 
 # DB 세션 열기
 session = SessionLocal()
-
+햣
 # ✅ 모든 user_id → group_id 매핑 가져오기
 user_group_map = {
     row.user_id: row.group_id
