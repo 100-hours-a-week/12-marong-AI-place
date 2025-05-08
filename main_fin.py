@@ -45,7 +45,7 @@ embedding_model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")
 # ChromaDB HttpClient 연결
 chroma_client = HttpClient(
     host="localhost",
-    port=8000,
+    port=8001,
     ssl=False
 )
 
