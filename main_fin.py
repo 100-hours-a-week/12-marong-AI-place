@@ -15,6 +15,7 @@ from datetime import datetime
 from get_week_index import GetWeekIndex
 from average_latlng import AverageLatLng
 from concurrent.futures import ThreadPoolExecutor
+from uuid import uuid4
 import torch, asyncio, logging
 
 logger = logging.getLogger("uvicorn.error")
@@ -168,6 +169,34 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
 
         db.commit()
 
+        history_collection = chroma_client.get_or_create_collection(name="history_collection")
+
+        timestamp = datetime.now().isoformat()
+        history_docs = []
+        history_metas = []
+        history_ids = []
+
+        for place in food_results + cafe_results:
+            history_docs.append(place['name'])
+            history_ids.append(f"history__{uuid4()}")
+            history_metas.append({
+                "week": week_index,
+                "user_id": me['id'],
+                "manitto_id": manitto['id'],
+                "group_id": 1,  # 필요시 동적 처리
+                "place_name": place.get("name"),
+                "category": place.get("category"),
+                "opening_hours": place.get("operation_hour"),
+                "address": place.get("address"),
+                "timestamp": timestamp
+            })
+
+            history_collection.add(
+                ids=history_ids,
+                documents=history_docs,
+                metadatas=history_metas
+            )
+        
         return {
             "index": week_index,
             "user_id_pair": [me['id'], manitto['id']],
