@@ -43,7 +43,7 @@ try:
 
     chroma_client = HttpClient(
         host="localhost",
-        port=8000,
+        port=8001,
         ssl=False
     )
 except Exception as e:
