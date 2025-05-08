@@ -22,9 +22,9 @@ user_ids = [user.id for user in session.query(Users.id).all()]
 
 # 과거 매칭 정보 가져오기
 previous_matches = {}
-matches = session.query(Manittos.giver_id, Manittos.receiver_id, Manittos.week).all()
-for giver, receiver, week in matches:
-    key = frozenset([giver, receiver])
+matches = session.query(Manittos.manittee_id, Manittos.manitto_id, Manittos.week).all()
+for manittee, manitto, week in matches:
+    key = frozenset([manittee, manitto])
     if key not in previous_matches or week > previous_matches[key]:
         previous_matches[key] = week
 
@@ -45,8 +45,8 @@ for u1, u2 in pairs:
     # Manittos 테이블에 저장
     session.add(Manittos(
         group_id=GROUP_ID,
-        giver_id=u1,
-        receiver_id=u2,
+        manittee_id=u1,
+        manitto_id=u2,
         week=current_week
     ))
 

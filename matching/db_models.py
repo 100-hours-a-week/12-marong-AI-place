@@ -21,6 +21,6 @@ class Manittos(Base):
     __tablename__ = "Manittos"
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     group_id = Column(BigInteger, ForeignKey("Groups.id"), index=True, nullable=False)
-    giver_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
-    receiver_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
+    manittee_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
+    manitto_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
     week = Column(Integer, nullable=False)
