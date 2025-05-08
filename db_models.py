@@ -6,32 +6,32 @@ Base = declarative_base()
 
 class Users(Base):
     __tablename__ = "Users"
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
 
 class SurveyMBTI(Base):
     __tablename__ = "SurveyMBTI"
-    id = Column(BigInteger, primary_key=True)
-    user_id = Column(BigInteger, index=True)
-    ei_score = Column(Integer)
-    sn_score = Column(Integer)
-    tf_score = Column(Integer)
-    jp_score = Column(Integer)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    user_id = Column(BigInteger, index=True, nullable=False)
+    ei_score = Column(Integer, nullable=False)
+    sn_score = Column(Integer, nullable=False)
+    tf_score = Column(Integer, nullable=False)
+    jp_score = Column(Integer, nullable=False)
 
 class SurveyLikedFood(Base):
     __tablename__ = "SurveyLikedFood"
-    id = Column(BigInteger, primary_key=True)
-    user_id = Column(BigInteger, index=True)
-    food_name = Column(String(100))
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    user_id = Column(BigInteger, index=True, nullable=False)
+    food_name = Column(String(100), nullable=False)
 
 class SurveyDislikedFood(Base):
     __tablename__ = "SurveyDislikedFood"
-    id = Column(BigInteger, primary_key=True)
-    user_id = Column(BigInteger, index=True)
-    food_name = Column(String(100))
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    user_id = Column(BigInteger, index=True, nullable=False)
+    food_name = Column(String(100), nullable=False)
 
 class PlaceRecommendationSessions(Base):
     __tablename__ = "PlaceRecommendationSessions"
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
     manittee_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
     manitto_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
     week = Column(Integer, nullable=False)
@@ -40,7 +40,7 @@ class PlaceRecommendationSessions(Base):
 
 class PlaceRecommendations(Base):
     __tablename__ = "PlaceRecommendations"
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
     session_id = Column(BigInteger, ForeignKey("PlaceRecommendationSessions.id"), nullable=False)
     type = Column(String(20), nullable=False)  # 'cafe' or 'restaurant'
     name = Column(String(150), nullable=False)

@@ -149,7 +149,7 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
         for place in food_results:
             db.add(PlaceRecommendations(
                 session_id=session_entry.id,
-                type="식당",
+                type="restaurant",
                 name=place['name'],
                 category=place.get('category'),
                 opening_hours=place.get('operation_hour'),
@@ -159,7 +159,7 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
         for place in cafe_results:
             db.add(PlaceRecommendations(
                 session_id=session_entry.id,
-                type="카페",
+                type="cafe",
                 name=place['name'],
                 category=place.get('category'),
                 opening_hours=place.get('operation_hour'),
