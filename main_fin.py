@@ -191,6 +191,8 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
                 "category": place.get("category"),
                 "opening_hours": place.get("operation_hour"),
                 "address": place.get("address"),
+                "latitude": place.get('latitude'),
+                "longitude": place.get('longitude'),
                 "timestamp": timestamp
             })
 
