@@ -154,7 +154,9 @@ class RecommendPlace:
                             "link": metadata.get("링크", ""),
                             "score": score,
                             "category": metadata.get("대표카테고리", "미분류"),
-                            "operation_hour": metadata.get("영업시간", "")
+                            "operation_hour": metadata.get("영업시간", ""),
+                            "latitude": lat_p,
+                            "longitude": lng_p
                         }
 
             process_results(review_results, 0.4, self.allow_cafe, 0.2)

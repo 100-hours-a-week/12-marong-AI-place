@@ -1,4 +1,4 @@
-from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey, Text
+from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey, Text, DECIMAL
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -47,5 +47,7 @@ class PlaceRecommendations(Base):
     category = Column(String(50))
     opening_hours = Column(Text)
     address = Column(String(255))
+    latitude = Column(DECIMAL(10, 7))
+    longitude = Column(DECIMAL(10, 7))
 
     session = relationship("PlaceRecommendationSessions", back_populates="recommendations")

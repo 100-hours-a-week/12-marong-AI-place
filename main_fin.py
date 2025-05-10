@@ -154,7 +154,9 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
                 name=place['name'],
                 category=place.get('category'),
                 opening_hours=place.get('operation_hour'),
-                address=place.get('address')
+                address=place.get('address'),
+                latitude=place.get('latitude'),
+                longitude=place.get('longitude')
             ))
 
         for place in cafe_results:
@@ -164,7 +166,9 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
                 name=place['name'],
                 category=place.get('category'),
                 opening_hours=place.get('operation_hour'),
-                address=place.get('address')
+                address=place.get('address'),
+                latitude=place.get('latitude'),
+                longitude=place.get('longitude')
             ))
 
         db.commit()
@@ -183,7 +187,6 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
                 "week": week_index,
                 "user_id": me['id'],
                 "manitto_id": manitto['id'],
-                "group_id": 1,  # 필요시 동적 처리
                 "place_name": place.get("name"),
                 "category": place.get("category"),
                 "opening_hours": place.get("operation_hour"),
