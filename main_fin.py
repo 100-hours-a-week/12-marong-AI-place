@@ -88,6 +88,38 @@ def build_user_input(user_id: int, lat: float, lng: float, db: Session):
         "dislikedFoods": [x.food_name for x in disliked]
     }
 
+async def get_chroma_mbti_with_timeout(chroma_client, me_id, manitto_id, timeout=3):
+    loop = asyncio.get_running_loop()
+    collection = chroma_client.get_or_create_collection(name="user_mbti_latest")
+
+    def blocking_get():
+        me_doc = collection.get(where={"id": me_id})
+        manitto_doc = collection.get(where={"id": manitto_id})
+        return me_doc, manitto_doc
+
+    try:
+        me_doc, manitto_doc = await asyncio.wait_for(
+            loop.run_in_executor(None, blocking_get),
+            timeout=timeout
+        )
+
+        if not me_doc or not manitto_doc:
+            raise ValueError("MBTI 정보가 하나 이상 존재하지 않음")
+
+        me_data = me_doc[0]
+        manitto_data = manitto_doc[0]
+
+        return [
+            (me_data['ei_score'] + manitto_data['ei_score']) / 2,
+            (me_data['sn_score'] + manitto_data['sn_score']) / 2,
+            (me_data['tf_score'] + manitto_data['tf_score']) / 2,
+            (me_data['jp_score'] + manitto_data['jp_score']) / 2
+        ]
+
+    except Exception as e:
+        logger.warning(f"[Timeout or Error] ChromaDB MBTI 조회 실패: {e}")
+        return None    
+
 # 추천 요청 엔드포인트
 @app.post("/recommend/place")
 async def recommend_places(req: RecommendationRequest, db: Session = Depends(get_db)):
@@ -95,12 +127,16 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
         me = build_user_input(req.me_id, req.me_lat, req.me_lng, db)
         manitto = build_user_input(req.manitto_id, req.manitto_lat, req.manitto_lng, db)
 
-        avg_vector = [
-            (me['eiScore'] + manitto['eiScore']) / 2,
-            (me['snScore'] + manitto['snScore']) / 2,
-            (me['tfScore'] + manitto['tfScore']) / 2,
-            (me['jpScore'] + manitto['jpScore']) / 2
-        ]
+        avg_vector = await get_chroma_mbti_with_timeout(chroma_client, req.me_id, req.manitto_id)
+
+        if avg_vector is None:
+            logger.info("백엔드 DB에서 MBTI 점수를 가져옵니다.")
+            avg_vector = [
+                (me['eiScore'] + manitto['eiScore']) / 2,
+                (me['snScore'] + manitto['snScore']) / 2,
+                (me['tfScore'] + manitto['tfScore']) / 2,
+                (me['jpScore'] + manitto['jpScore']) / 2
+            ]
 
         average_loc = AverageLatLng(me['latitude'], me['longitude'], manitto['latitude'], manitto['longitude'])
         average_loc.loc_to_vec()
@@ -138,6 +174,7 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
 
         food_results, cafe_results = await asyncio.gather(food_task, cafe_task)
 
+        # 1. 세션 엔트리 저장
         session_entry = PlaceRecommendationSessions(
             manittee_id=me['id'],
             manitto_id=manitto['id'],
@@ -147,8 +184,11 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
         db.commit()
         db.refresh(session_entry)
 
+        # 2. 음식점 + 카페 결과를 한 번에 저장
+        places_to_add = []
+
         for place in food_results:
-            db.add(PlaceRecommendations(
+            places_to_add.append(PlaceRecommendations(
                 session_id=session_entry.id,
                 type="restaurant",
                 name=place['name'],
@@ -160,7 +200,7 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
             ))
 
         for place in cafe_results:
-            db.add(PlaceRecommendations(
+            places_to_add.append(PlaceRecommendations(
                 session_id=session_entry.id,
                 type="cafe",
                 name=place['name'],
@@ -171,37 +211,36 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
                 longitude=place.get('longitude')
             ))
 
+        # 한번에 insert
+        db.add_all(places_to_add)
         db.commit()
 
+        # 3. ChromaDB 히스토리 저장도 묶어서 호출
         history_collection = chroma_client.get_or_create_collection(name="history_collection")
 
         timestamp = datetime.now().isoformat()
-        history_docs = []
-        history_metas = []
-        history_ids = []
+        history_docs = [place['name'] for place in food_results + cafe_results]
+        history_ids = [f"history__{uuid4()}" for _ in history_docs]
+        history_metas = [{
+            "week": week_index,
+            "user_id": me['id'],
+            "manitto_id": manitto['id'],
+            "place_name": place.get("name"),
+            "category": place.get("category"),
+            "opening_hours": place.get("operation_hour"),
+            "address": place.get("address"),
+            "latitude": place.get('latitude'),
+            "longitude": place.get('longitude'),
+            "timestamp": timestamp
+        } for place in food_results + cafe_results]
 
-        for place in food_results + cafe_results:
-            history_docs.append(place['name'])
-            history_ids.append(f"history__{uuid4()}")
-            history_metas.append({
-                "week": week_index,
-                "user_id": me['id'],
-                "manitto_id": manitto['id'],
-                "place_name": place.get("name"),
-                "category": place.get("category"),
-                "opening_hours": place.get("operation_hour"),
-                "address": place.get("address"),
-                "latitude": place.get('latitude'),
-                "longitude": place.get('longitude'),
-                "timestamp": timestamp
-            })
+        # 한번에 add()
+        history_collection.add(
+            ids=history_ids,
+            documents=history_docs,
+            metadatas=history_metas
+        )
 
-            history_collection.add(
-                ids=history_ids,
-                documents=history_docs,
-                metadatas=history_metas
-            )
-        
         return {
             "index": week_index,
             "user_id_pair": [me['id'], manitto['id']],
