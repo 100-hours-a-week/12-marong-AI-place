@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import List
 from sqlalchemy.orm import Session
 from db import SessionLocal
-from db_models import SurveyMBTI, SurveyLikedFood, SurveyDislikedFood, PlaceRecommendationSessions, PlaceRecommendations
+from db_models import SurveyMBTI, SurveyLikedFood, SurveyDislikedFood, PlaceRecommendationSessions, PlaceRecommendations, Manittos
 from sentence_transformers import SentenceTransformer
 from recommend_place import RecommendPlace
 from mbti_projector import MBTIProjector
@@ -26,6 +26,17 @@ executor = ThreadPoolExecutor()
 async def recommend_async(recommender, *args, **kwargs):
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(executor, lambda: recommender.recommend(*args, **kwargs))
+
+def get_manitto_id_by_manittee(db: Session, manittee_id: int, week: int) -> int:
+    entry = db.query(Manittos).filter(
+        Manittos.manittee_id == manittee_id,
+        Manittos.week == week
+    ).first()
+
+    if entry is None:
+        raise HTTPException(status_code=404, detail="마니또 정보가 없습니다.")
+    
+    return entry.manitto_id
 
 # 날짜 기준 주차 계산
 base_date = datetime(2025, 1, 6)
@@ -52,12 +63,13 @@ chroma_client = HttpClient(
 
 # 입력 스키마
 class RecommendationRequest(BaseModel):
+    # mvp는 사용자 위치만 사용
     me_id: int
-    manitto_id: int
     me_lat: float
     me_lng: float
-    manitto_lat: float
-    manitto_lng: float
+    # manitto_id: int
+    # manitto_lat: float
+    # manitto_lng: float
 
 # DB 세션
 def get_db():
@@ -125,9 +137,12 @@ async def get_chroma_mbti_with_timeout(chroma_client, me_id, manitto_id, timeout
 async def recommend_places(req: RecommendationRequest, db: Session = Depends(get_db)):
     try:
         me = build_user_input(req.me_id, req.me_lat, req.me_lng, db)
-        manitto = build_user_input(req.manitto_id, req.manitto_lat, req.manitto_lng, db)
+        manitto_id = get_manitto_id_by_manittee(db, manittee_id=req.me_id, week=week_index)
+        
+        # mvp는 사용자 위치를 마니또 위치로 사용
+        manitto = build_user_input(manitto_id, req.me_lat, req.me_lng, db)
 
-        avg_vector = await get_chroma_mbti_with_timeout(chroma_client, req.me_id, req.manitto_id)
+        avg_vector = await get_chroma_mbti_with_timeout(chroma_client, req.me_id, manitto_id)
 
         if avg_vector is None:
             logger.info("백엔드 DB에서 MBTI 점수를 가져옵니다.")
