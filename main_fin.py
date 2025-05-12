@@ -90,7 +90,7 @@ def build_user_input(user_id: int, lat: float, lng: float, db: Session):
 
 async def get_chroma_mbti_with_timeout(chroma_client, me_id, manitto_id, timeout=3):
     loop = asyncio.get_running_loop()
-    collection = chroma_client.get_or_create_collection(name="user_mbti_latest")
+    collection = chroma_client.get_or_create_collection(name="user_latest")
 
     def blocking_get():
         me_doc = collection.get(where={"id": me_id})
