@@ -1,5 +1,6 @@
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
 from sqlalchemy.orm import Session
@@ -45,6 +46,21 @@ week_index = GetWeekIndex(today, base_date).get()
 
 # FastAPI 서버
 app = FastAPI()
+
+# TODO: CORS 설정 나중에 지우기
+origins = [
+    "http://localhost:5173",
+    "http://localhost",
+    "http://localhost:8080",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
 
 # 모델 로딩
 mbti_model = MBTIProjector()
