@@ -17,9 +17,12 @@ from get_week_index import GetWeekIndex
 from average_latlng import AverageLatLng
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
-import torch, asyncio, logging
+from dotenv import load_dotenv
+import torch, asyncio, logging, os
 
 logger = logging.getLogger("uvicorn.error")
+
+load_dotenv()
 
 executor = ThreadPoolExecutor()
 
@@ -70,10 +73,14 @@ mbti_model.eval()
 # 임베딩 모델 로딩
 embedding_model = SentenceTransformer("snunlp/KR-SBERT-V40K-klueNLI-augSTS")
 
+# ChromaDB 설정
+CHROMA_HOST = os.getenv("CHROMA_HOST")
+CHROMA_PORT = os.getenv("CHROMA_PORT")
+
 # ChromaDB HttpClient 연결
 chroma_client = HttpClient(
-    host="localhost",
-    port=8001,
+    host=f"{CHROMA_HOST}",
+    port=f"{CHROMA_PORT}",
     ssl=False
 )
 
