@@ -43,6 +43,7 @@ pip install -r requirements.txt
 2. **서버 실행**:
 
 ```bash
+python sbert_down.py
 python run_chroma.py
 fastapi dev main.py
 ```

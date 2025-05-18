@@ -58,19 +58,24 @@ class RecommendPlace:
 
     def recommend(self, lat, lng, radius_km=10.0, top_k=5, like_foods=[], dislike_foods=[]):
         try:
-            food_embs = []
-            for food in like_foods:
-                food_embs.append(1.5 * self.embedding_model.encode(food, convert_to_tensor=True))
-            for food in dislike_foods:
-                food_embs.append(-1.5 * self.embedding_model.encode(food, convert_to_tensor=True))
+            all_foods = like_foods + dislike_foods
+            if all_foods:
+                # ✅ 한번에 인코딩
+                embeddings = self.embedding_model.encode(all_foods, convert_to_tensor=True)
 
-            if food_embs:
-                food_tensor = F.normalize(torch.stack(food_embs).mean(dim=0, keepdim=True), dim=1).to(self.device)
+                like_len = len(like_foods)
+                like_embs = embeddings[:like_len] * 1.5
+                dislike_embs = embeddings[like_len:] * -1.5
+
+                all_embs = torch.cat([like_embs, dislike_embs], dim=0)
+                food_tensor = F.normalize(all_embs.mean(dim=0, keepdim=True), dim=1).to(self.device)
+
                 user_pref_vector = F.normalize(
                     torch.tensor(self.user_vibe, device=self.device) + food_tensor, dim=1
                 ).cpu().numpy()
             else:
                 user_pref_vector = self.user_vibe
+                
         except Exception as e:
             logger.error(f"선호 음식 벡터 계산 실패: {e}")
             raise RuntimeError(f"선호 음식 벡터 계산 실패: {e}")
