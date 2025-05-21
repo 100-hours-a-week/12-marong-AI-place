@@ -9,18 +9,16 @@ def run_chroma():
         CHROMA_PORT = os.getenv("CHROMA_PORT")
         CHROMA_PATH = os.getenv("CHROMA_PATH")
 
-        # 백그라운드 실행 (nohup처럼)
         command = [
+            "nohup",
             "chroma",
             "run",
             "--host", "0.0.0.0",
             "--port", str(CHROMA_PORT),
             "--path", CHROMA_PATH
         ]
-
-        # ✅ 백그라운드 실행
         subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print("✅ ChromaDB가 백그라운드에서 실행되었습니다.")
+        print("ChromaDB가 백그라운드에서 실행되었습니다.")
 
     except FileNotFoundError:
         print("❌ 'chroma' 명령어를 찾을 수 없습니다. PATH에 등록되어 있는지 확인하세요.")
