@@ -9,15 +9,8 @@ def run_chroma():
         CHROMA_PORT = os.getenv("CHROMA_PORT")
         CHROMA_PATH = os.getenv("CHROMA_PATH")
 
-        command = [
-            "nohup",
-            "chroma",
-            "run",
-            "--host", "0.0.0.0",
-            "--port", str(CHROMA_PORT),
-            "--path", CHROMA_PATH
-        ]
-        subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        command = f"nohup chroma run --host 0.0.0.0 --port {CHROMA_PORT} --path {CHROMA_PATH} > chroma.log 2>&1 &"
+        subprocess.Popen(command, shell=True)
         print("ChromaDB가 백그라운드에서 실행되었습니다.")
 
     except FileNotFoundError:
