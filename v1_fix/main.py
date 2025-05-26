@@ -21,7 +21,7 @@ load_dotenv()
 
 base_date = datetime(2025, 1, 6)
 today = datetime.today()
-week_index = GetWeekIndex(today, base_date).get() - 1
+week_index = GetWeekIndex(today, base_date).get()
 
 CHROMA_HOST = os.getenv("CHROMA_HOST")
 CHROMA_PORT = os.getenv("CHROMA_PORT")
@@ -62,9 +62,7 @@ def get_avg_vector(me, manitto):
         (me['jpScore'] + manitto['jpScore']) / 2
     ]
 
-
 # --- (생략) 기존 코드 그대로 ---
-
 # process_pair 함수 수정: db 파라미터 추가
 async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model, db):
     try:
