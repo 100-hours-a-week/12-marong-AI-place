@@ -21,7 +21,7 @@ load_dotenv()
 
 base_date = datetime(2025, 1, 6)
 today = datetime.today()
-week_index = GetWeekIndex(today, base_date).get()
+week_index = GetWeekIndex(today, base_date).get() - 1
 
 CHROMA_HOST = os.getenv("CHROMA_HOST")
 CHROMA_PORT = os.getenv("CHROMA_PORT")
@@ -63,8 +63,10 @@ def get_avg_vector(me, manitto):
     ]
 
 
-async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
-    db = SessionLocal()
+# --- (생략) 기존 코드 그대로 ---
+
+# process_pair 함수 수정: db 파라미터 추가
+async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model, db):
     try:
         manittee_id = pair.manittee_id
         manitto_id = pair.manitto_id
@@ -160,23 +162,25 @@ async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_mo
 
     except Exception as e:
         logger.error(f"[ERROR] user_id={pair.manittee_id}, manitto_id={pair.manitto_id} 추천 실패: {e}")
-    finally:
-        db.close()
 
 
+# run_batch_recommendation 함수 수정
 async def run_batch_recommendation():
     start_time = datetime.now()
     print(f"[START] 장소 추천 실행 시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     db = SessionLocal()
-    pairs = db.query(Manittos).filter(Manittos.week == week_index).all()
-    db.close()
+    try:
+        pairs = db.query(Manittos).filter(Manittos.week == week_index).all()
 
-    tasks = [
-        process_pair(pair, week_index, chroma_client, embedding_model, mbti_model)
-        for pair in pairs
-    ]
-    await asyncio.gather(*tasks)
+        tasks = [
+            process_pair(pair, week_index, chroma_client, embedding_model, mbti_model, db)
+            for pair in pairs
+        ]
+        await asyncio.gather(*tasks)
+
+    finally:
+        db.close()
 
     end_time = datetime.now()
     elapsed = end_time - start_time
