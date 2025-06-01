@@ -65,7 +65,7 @@ class RecommendPlace:
 
                 like_len = len(like_foods)
                 like_embs = embeddings[:like_len] * 1.5
-                dislike_embs = embeddings[like_len:] * -1.5
+                dislike_embs = embeddings[like_len:] * -4.5
 
                 all_embs = torch.cat([like_embs, dislike_embs], dim=0)
                 food_tensor = F.normalize(all_embs.mean(dim=0, keepdim=True), dim=1).to(self.device)
