@@ -107,7 +107,7 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
 
         history_collection = chroma_client.get_or_create_collection(name="history_collection")
 
-        for uid in [manitto_id, manittee_id]:
+        for uid in [manitto_id]:
             session_entry = PlaceRecommendationSessions(
                 manitto_id=uid,
                 manittee_id=manittee_id if uid == manitto_id else manitto_id,
