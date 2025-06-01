@@ -1,16 +1,16 @@
 import os
 import torch
-import asyncio
 import logging
 from datetime import datetime
 from uuid import uuid4
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from db import SessionLocal
 from db_models import SurveyMBTI, SurveyLikedFood, SurveyDislikedFood, PlaceRecommendationSessions, PlaceRecommendations, Manittos
 from sentence_transformers import SentenceTransformer
-from async_recommend_place import RecommendPlaceAsync
+from recommend_place import RecommendPlace
 from mbti_projector import MBTIProjector
 from chromadb import HttpClient
 from get_week_index import GetWeekIndex
@@ -62,16 +62,17 @@ def get_avg_vector(me, manitto):
         (me['jpScore'] + manitto['jpScore']) / 2
     ]
 
-# --- (생략) 기존 코드 그대로 ---
 # process_pair 함수 수정: db 파라미터 추가
-async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model, db):
+def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
+    db = SessionLocal()
+    
     try:
-        manittee_id = pair.manittee_id
         manitto_id = pair.manitto_id
+        manittee_id = pair.manittee_id
         lat, lng = 37.401115170038, 127.10625450375  # 유스페이스1
 
-        me = build_user_input(manittee_id, lat, lng, db)
-        manitto = build_user_input(manitto_id, lat, lng, db)
+        me = build_user_input(manitto_id, lat, lng, db)
+        manitto = build_user_input(manittee_id, lat, lng, db)
         avg_vector = get_avg_vector(me, manitto)
 
         average_loc = AverageLatLng(lat, lng, lat, lng)
@@ -81,7 +82,7 @@ async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_mo
         like_foods = list(set(me['likedFoods'] + manitto['likedFoods']))
         dislike_foods = list(set(me['dislikedFoods'] + manitto['dislikedFoods']))
 
-        food_recommender = RecommendPlaceAsync(
+        food_recommender = RecommendPlace(
             model=mbti_model,
             embedding_model=embedding_model,
             mbti_vector=avg_vector,
@@ -91,7 +92,7 @@ async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_mo
             allow_cafe=False
         )
 
-        cafe_recommender = RecommendPlaceAsync(
+        cafe_recommender = RecommendPlace(
             model=mbti_model,
             embedding_model=embedding_model,
             mbti_vector=avg_vector,
@@ -101,17 +102,15 @@ async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_mo
             allow_cafe=True
         )
 
-        food_results, cafe_results = await asyncio.gather(
-            food_recommender.recommend(avg_lat, avg_lng, 10, 5, like_foods, dislike_foods),
-            cafe_recommender.recommend(avg_lat, avg_lng, 10, 5, like_foods, dislike_foods)
-        )
+        food_results = food_recommender.recommend(avg_lat, avg_lng, 10, 5, like_foods, dislike_foods)
+        cafe_results = cafe_recommender.recommend(avg_lat, avg_lng, 10, 5, like_foods, dislike_foods)
 
         history_collection = chroma_client.get_or_create_collection(name="history_collection")
 
-        for uid in [manittee_id, manitto_id]:
+        for uid in [manitto_id, manittee_id]:
             session_entry = PlaceRecommendationSessions(
-                manittee_id=uid,
-                manitto_id=manitto_id if uid == manittee_id else manittee_id,
+                manitto_id=uid,
+                manittee_id=manittee_id if uid == manitto_id else manitto_id,
                 week=week_index
             )
             db.add(session_entry)
@@ -156,29 +155,34 @@ async def process_pair(pair, week_index, chroma_client, embedding_model, mbti_mo
                 metadatas=history_metas
             )
 
-        print(f"✅ [완료] user_id: {manittee_id} ↔ manitto_id: {manitto_id}")
+        print(f"✅ [완료] user_id: {manitto_id} ↔ manittee_id: {manittee_id}")
 
     except Exception as e:
-        logger.error(f"[ERROR] user_id={pair.manittee_id}, manitto_id={pair.manitto_id} 추천 실패: {e}")
+        logger.error(f"[ERROR] user_id={pair.manitto_id}, manitto_id={pair.manittee_id} 추천 실패: {e}")
 
 
 # run_batch_recommendation 함수 수정
-async def run_batch_recommendation():
+def run_batch_recommendation():
     start_time = datetime.now()
     print(f"[START] 장소 추천 실행 시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
 
     db = SessionLocal()
     try:
         pairs = db.query(Manittos).filter(Manittos.week == week_index).all()
-
-        tasks = [
-            process_pair(pair, week_index, chroma_client, embedding_model, mbti_model, db)
-            for pair in pairs
-        ]
-        await asyncio.gather(*tasks)
-
     finally:
         db.close()
+        
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        futures = [
+            executor.submit(process_pair, pair, week_index, chroma_client, embedding_model, mbti_model)
+            for pair in pairs
+        ]
+
+        for future in as_completed(futures):
+            try:
+                future.result()
+            except Exception as e:
+                logger.error(f"[ERROR] 추천 처리 실패: {e}")
 
     end_time = datetime.now()
     elapsed = end_time - start_time
@@ -186,4 +190,4 @@ async def run_batch_recommendation():
 
 
 if __name__ == "__main__":
-    asyncio.run(run_batch_recommendation())
+    run_batch_recommendation()
