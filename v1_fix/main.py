@@ -54,12 +54,12 @@ def build_user_input(user_id: int, lat: float, lng: float, db: Session):
     }
 
 
-def get_avg_vector(me, manitto):
+def get_avg_vector(me, manittee):
     return [
-        (me['eiScore'] + manitto['eiScore']) / 2,
-        (me['snScore'] + manitto['snScore']) / 2,
-        (me['tfScore'] + manitto['tfScore']) / 2,
-        (me['jpScore'] + manitto['jpScore']) / 2
+        (me['eiScore'] + manittee['eiScore']) / 2,
+        (me['snScore'] + manittee['snScore']) / 2,
+        (me['tfScore'] + manittee['tfScore']) / 2,
+        (me['jpScore'] + manittee['jpScore']) / 2
     ]
 
 # process_pair 함수 수정: db 파라미터 추가
@@ -72,15 +72,15 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         lat, lng = 37.401115170038, 127.10625450375  # 유스페이스1
 
         me = build_user_input(manitto_id, lat, lng, db)
-        manitto = build_user_input(manittee_id, lat, lng, db)
-        avg_vector = get_avg_vector(me, manitto)
+        manittee = build_user_input(manittee_id, lat, lng, db)
+        avg_vector = get_avg_vector(me, manittee)
 
         average_loc = AverageLatLng(lat, lng, lat, lng)
         average_loc.loc_to_vec()
         avg_lat, avg_lng = average_loc.get()
 
-        like_foods = list(set(me['likedFoods'] + manitto['likedFoods']))
-        dislike_foods = list(set(me['dislikedFoods'] + manitto['dislikedFoods']))
+        like_foods = list(set(me['likedFoods'] + manittee['likedFoods']))
+        dislike_foods = list(set(me['dislikedFoods'] + manittee['dislikedFoods']))
 
         food_recommender = RecommendPlace(
             model=mbti_model,
