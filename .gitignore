@@ -1,0 +1,14 @@
+./v2/__pycache__
+./v2/.DS_Store
+./v2/marong
+./v2/core/__pycache__
+./v2/db/__pycache__
+./v2/models/__pycache__
+./v2/scripts/*.csv
+./v2/scripts/*.ipynb
+./v2/db/web_crawler.py
+./v2/kr-sbert
+./v2/chroma.log
+./README.md
+./DS_Store
+./v2/env
