@@ -9,6 +9,6 @@
 ./v2/db/web_crawler.py
 ./v2/kr-sbert
 ./v2/chroma.log
-./README.md
-./DS_Store
+.README.md
+.DS_Store
 ./v2/env
