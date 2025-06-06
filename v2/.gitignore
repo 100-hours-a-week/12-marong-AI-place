@@ -6,4 +6,6 @@
 ./models/__pycache__
 ./scripts/*.csv
 ./scripts/*.ipynb
+./db/web_crawler.py
+./chroma.log
 .env

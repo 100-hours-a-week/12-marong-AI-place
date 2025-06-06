@@ -18,7 +18,7 @@ from core.average_latlng import AverageLatLng
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 from dotenv import load_dotenv
-import torch, asyncio, logging, os
+import torch, logging, os
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -26,21 +26,16 @@ load_dotenv()
 
 executor = ThreadPoolExecutor()
 
-# 비동기 실행 함수
-async def recommend_async(recommender, *args, **kwargs):
-    loop = asyncio.get_running_loop()
-    return await loop.run_in_executor(executor, lambda: recommender.recommend(*args, **kwargs))
-
-def get_manitto_id_by_manittee(db: Session, manittee_id: int, week: int) -> int:
+def get_manittee_id_by_manitto(db: Session, manitto_id: int, week: int) -> int:
     entry = db.query(Manittos).filter(
-        Manittos.manittee_id == manittee_id,
+        Manittos.manitto_id == manitto_id,
         Manittos.week == week
     ).first()
 
     if entry is None:
         raise HTTPException(status_code=404, detail="마니또 정보가 없습니다.")
     
-    return entry.manitto_id
+    return entry.manittee_id
 
 # 날짜 기준 주차 계산
 base_date = datetime(2025, 1, 6)
@@ -84,6 +79,26 @@ chroma_client = HttpClient(
     ssl=False
 )
 
+def get_chroma_mbti(chroma_client, user_id):
+    collection = chroma_client.get_or_create_collection(name="user_latest")
+    
+    user_doc = collection.get(where={"user_id": user_id}, include=["metadatas"])
+
+    try:
+        if not user_doc:
+            raise ValueError("MBTI 정보가 하나 이상 존재하지 않음")
+
+        user_data = user_doc["metadatas"][0]
+        
+        return {'ei_score': user_data['ei_score'], 
+                'sn_score': user_data['sn_score'],
+                'tf_score': user_data['tf_score'],
+                'jp_score': user_data['jp_score']}
+
+    except Exception as e:
+        logger.warning(f"[Timeout or Error] ChromaDB MBTI 조회 실패: {e}")
+        return None
+
 # 입력 스키마
 class RecommendationRequest(BaseModel):
     # mvp는 사용자 위치만 사용
@@ -104,7 +119,9 @@ def get_db():
 
 # 사용자 정보 조합 함수
 def build_user_input(user_id: int, lat: float, lng: float, db: Session):
-    mbti = db.query(SurveyMBTI).filter(SurveyMBTI.user_id == user_id).first()
+    user_chroma_mbti = get_chroma_mbti(chroma_client, user_id)
+    
+    mbti = user_chroma_mbti if user_chroma_mbti else db.query(SurveyMBTI).filter(SurveyMBTI.user_id == user_id).first()
     liked = db.query(SurveyLikedFood).filter(SurveyLikedFood.user_id == user_id).all()
     disliked = db.query(SurveyDislikedFood).filter(SurveyDislikedFood.user_id == user_id).all()
     
@@ -113,75 +130,39 @@ def build_user_input(user_id: int, lat: float, lng: float, db: Session):
 
     return {
         "id": user_id,
-        "eiScore": mbti.ei_score,
-        "snScore": mbti.sn_score,
-        "tfScore": mbti.tf_score,
-        "jpScore": mbti.jp_score,
-        "latitude": lat,
-        "longitude": lng,
+        "eiScore": mbti['ei_score'] if user_chroma_mbti else mbti.ei_score,
+        "snScore": mbti['sn_score'] if user_chroma_mbti else mbti.sn_score,
+        "tfScore": mbti['tf_score'] if user_chroma_mbti else mbti.tf_score,
+        "jpScore": mbti['jp_score'] if user_chroma_mbti else mbti.jp_score,
+        "latitude": 37.401115170038,
+        "longitude": 127.10625450375,
         "likedFoods": [x.food_name for x in liked],
         "dislikedFoods": [x.food_name for x in disliked]
-    }
-
-async def get_chroma_mbti_with_timeout(chroma_client, me_id, manitto_id, timeout=10):
-    loop = asyncio.get_running_loop()
-    collection = chroma_client.get_or_create_collection(name="user_latest")
-
-    def blocking_get():
-        me_doc = collection.get(where={"user_id": me_id}, include=["metadatas"])
-        manitto_doc = collection.get(where={"user_id": manitto_id}, include=["metadatas"])
-        return me_doc, manitto_doc
-
-    try:
-        me_doc, manitto_doc = await asyncio.wait_for(
-            loop.run_in_executor(None, blocking_get),
-            timeout=timeout
-        )
-
-        if not me_doc or not manitto_doc:
-            raise ValueError("MBTI 정보가 하나 이상 존재하지 않음")
-
-        me_data = me_doc["metadatas"][0]
-        manitto_data = manitto_doc["metadatas"][0]
-
-        return [
-            (me_data['ei_score'] + manitto_data['ei_score']) / 2,
-            (me_data['sn_score'] + manitto_data['sn_score']) / 2,
-            (me_data['tf_score'] + manitto_data['tf_score']) / 2,
-            (me_data['jp_score'] + manitto_data['jp_score']) / 2
-        ]
-
-    except Exception as e:
-        logger.warning(f"[Timeout or Error] ChromaDB MBTI 조회 실패: {e}")
-        return None    
+    } 
 
 # 추천 요청 엔드포인트
 @app.post("/recommend/place")
-async def recommend_places(req: RecommendationRequest, db: Session = Depends(get_db)):
+def recommend_places(req: RecommendationRequest, db: Session = Depends(get_db)):
     try:
         me = build_user_input(req.me_id, req.me_lat, req.me_lng, db)
-        manitto_id = get_manitto_id_by_manittee(db, manittee_id=req.me_id, week=week_index)
+        manittee_id = get_manittee_id_by_manitto(db, manitto_id=req.me_id, week=week_index)
         
-        # mvp는 사용자 위치를 마니또 위치로 사용
-        manitto = build_user_input(manitto_id, req.me_lat, req.me_lng, db)
+        # mvp는 사용자 위치를 마니띠 위치로 사용
+        manittee = build_user_input(manittee_id, req.me_lat, req.me_lng, db)
 
-        avg_vector = await get_chroma_mbti_with_timeout(chroma_client, req.me_id, manitto_id)
+        avg_vector = [
+            (me['eiScore'] + manittee['eiScore']) / 2,
+            (me['snScore'] + manittee['snScore']) / 2,
+            (me['tfScore'] + manittee['tfScore']) / 2,
+            (me['jpScore'] + manittee['jpScore']) / 2
+        ]
 
-        if avg_vector is None:
-            logger.info("백엔드 DB에서 MBTI 점수를 가져옵니다.")
-            avg_vector = [
-                (me['eiScore'] + manitto['eiScore']) / 2,
-                (me['snScore'] + manitto['snScore']) / 2,
-                (me['tfScore'] + manitto['tfScore']) / 2,
-                (me['jpScore'] + manitto['jpScore']) / 2
-            ]
-
-        average_loc = AverageLatLng(me['latitude'], me['longitude'], manitto['latitude'], manitto['longitude'])
+        average_loc = AverageLatLng(me['latitude'], me['longitude'], manittee['latitude'], manittee['longitude'])
         average_loc.loc_to_vec()
         avg_lat, avg_lng = average_loc.get()
 
-        like_foods = list(set(me['likedFoods'] + manitto['likedFoods']))
-        dislike_foods = list(set(me['dislikedFoods'] + manitto['dislikedFoods']))
+        like_foods = list(set(me['likedFoods'] + manittee['likedFoods']))
+        dislike_foods = list(set(me['dislikedFoods'] + manittee['dislikedFoods']))
 
         food_recommender = RecommendPlace(
             model=mbti_model,
@@ -205,17 +186,13 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
             embedding_func=None
         )
 
-        food_task = recommend_async(food_recommender, lat=avg_lat, lng=avg_lng, radius_km=10,
-                                    like_foods=like_foods, dislike_foods=dislike_foods)
-        cafe_task = recommend_async(cafe_recommender, lat=avg_lat, lng=avg_lng, radius_km=10,
-                                    like_foods=like_foods, dislike_foods=dislike_foods)
-
-        food_results, cafe_results = await asyncio.gather(food_task, cafe_task)
+        food_results = food_recommender(lat=avg_lat, lng=avg_lng, radius_km=10, like_foods=like_foods, dislike_foods=dislike_foods)
+        cafe_results = cafe_recommender(lat=avg_lat, lng=avg_lng, radius_km=10, like_foods=like_foods, dislike_foods=dislike_foods)
 
         # 1. 세션 엔트리 저장
         session_entry = PlaceRecommendationSessions(
-            manittee_id=me['id'],
-            manitto_id=manitto['id'],
+            manitto_id=me['id'],
+            manittee_id=manittee['id'],
             week=week_index
         )
         db.add(session_entry)
@@ -262,7 +239,7 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
         history_metas = [{
             "week": week_index,
             "user_id": me['id'],
-            "manitto_id": manitto['id'],
+            "manitto_id": manittee['id'],
             "place_name": place.get("name"),
             "category": place.get("category"),
             "opening_hours": place.get("operation_hour"),
@@ -281,7 +258,7 @@ async def recommend_places(req: RecommendationRequest, db: Session = Depends(get
 
         return {
             "index": week_index,
-            "user_id_pair": [me['id'], manitto['id']],
+            "user_id_pair": [me['id'], manittee['id']],
             "message": "recommend_success",
             "food_data": food_results,
             "cafe_data": cafe_results

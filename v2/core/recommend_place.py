@@ -62,7 +62,7 @@ class RecommendPlace:
             for food in like_foods:
                 food_embs.append(1.5 * self.embedding_model.encode(food, convert_to_tensor=True))
             for food in dislike_foods:
-                food_embs.append(-1.5 * self.embedding_model.encode(food, convert_to_tensor=True))
+                food_embs.append(-4.5 * self.embedding_model.encode(food, convert_to_tensor=True))
 
             if food_embs:
                 food_tensor = F.normalize(torch.stack(food_embs).mean(dim=0, keepdim=True), dim=1).to(self.device)

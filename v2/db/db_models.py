@@ -75,8 +75,8 @@ class SurveyDislikedFood(Base):
 class PlaceRecommendationSessions(Base):
     __tablename__ = "PlaceRecommendationSessions"
     id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
-    manittee_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
     manitto_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
+    manittee_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
     week = Column(Integer, nullable=False)
 
     recommendations = relationship("PlaceRecommendations", back_populates="session")
@@ -101,6 +101,6 @@ class Manittos(Base):
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
     group_id = Column(BigInteger, ForeignKey("Groups.id", ondelete="CASCADE"), index=True, nullable=False)
-    manittee_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
     manitto_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
+    manittee_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
     week = Column(Integer, nullable=False)
