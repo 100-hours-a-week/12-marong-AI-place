@@ -1,0 +1,11 @@
+./__pycache__
+./.DS_Store
+./marong
+./core/__pycache__
+./db/__pycache__
+./models/__pycache__
+./scripts/*.csv
+./scripts/*.ipynb
+./db/web_crawler.py
+./chroma.log
+.env
