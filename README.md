@@ -1,4 +1,4 @@
-# Marong AI 플레이스 (Marong AI Place Recommendation)
+# Marong AI 장소 추천 (Marong AI Place Recommendation)
 
 **마롱(Marong)**은 마니또 기반 SNS 서비스의 장소 추천 기능을 담당하는 AI 시스템이며, 이 저장소는 사용자와 마니또의 MBTI 점수 및 위치 정보를 활용한 음식점·카페 추천기를 구현한 프로젝트입니다.
 
