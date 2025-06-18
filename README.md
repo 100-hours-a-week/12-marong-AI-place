@@ -1,69 +1,117 @@
-# 12-marong-AI-place
+# Marong AI 플레이스 (Marong AI Place Recommendation)
 
-![마롱](https://github.com/user-attachments/assets/60d19105-80c5-49e5-9c60-0b8400b0db35)
+**마롱(Marong)**은 마니또 기반 SNS 서비스의 장소 추천 기능을 담당하는 AI 시스템이며, 이 저장소는 사용자와 마니또의 MBTI 점수 및 위치 정보를 활용한 음식점·카페 추천기를 구현한 프로젝트입니다.
 
-## 프로젝트 개요
-
-**12-marong-AI-place**는 사용자와 마니또의 MBTI 점수와 위치 정보를 기반으로 음식점과 카페를 추천해주는 AI 기반 추천 시스템입니다.
+![Marong Logo](https://github.com/user-attachments/assets/60d19105-80c5-49e5-9c60-0b8400b0db35)
 
 ## 주요 기능
 
-- **MBTI 기반 추천**: 사용자와 마니또의 MBTI 점수를 평균내어 성향을 분석하고, 이에 맞는 장소를 추천합니다.
-- **선호/비선호 음식 고려**: 사용자의 선호 음식과 비선호 음식을 반영하여 추천 결과를 조정합니다.
-- **엔트로피 기반 추천 가중치 동적 조절**: 각 특성의 정보량(엔트로피)을 분석하여, 분포가 다양한(정보량이 큰) 특성에 더 높은 가중치를 부여함으로써 보다 정교하고 개인화된 추천을 제공합니다.
-- **위치 기반 고려**: 사용자와 마니또의 위도와 경도를 활용하여 추천 결과를 조정합니다.
-- **식당/카페 추천**: 사용자와 마니또에게 추천 점수가 높은 맞춤 식당과 카페를 추천합니다.
-- **동기 + 멀티스레딩 최적화 구조**: 식당/카페 추천을 `ThreadPoolExecutor`를 활용해 동시에 실행함으로써 프로그램 속도를 최적화하였습니다.
+- **MBTI 기반 추천**  
+  사용자와 마니또의 MBTI 점수를 평균내어 성향을 분석하고, 이에 맞는 장소를 추천합니다.
+- **선호/비선호 음식 필터**  
+  `likedFoods`와 `dislikedFoods`를 반영해 추천 결과를 조정합니다.
+- **엔트로피 가중치 동적 조절**  
+  각 특성의 정보량(엔트로피)을 계산하여, 정보량이 큰 특성에 더 높은 가중치를 부여합니다.
+- **위치 기반 스코어링**  
+  사용자·마니또의 위도·경도 정보를 활용해 거리를 계산하고, 거리 점수를 반영합니다.
+- **멀티스레딩 최적화**  
+  `ThreadPoolExecutor`를 활용해 추천 처리 과정을 병렬화함으로써 응답 속도를 개선했습니다.
+- **결과 저장**  
+  추천 결과를 `PlaceRecommendationSessions`, `PlaceRecommendations` 테이블에 자동 저장합니다.
 
-## 프로젝트 구조
+## 아키텍처 개요
 
 ```
-12-marong-AI-place/
-├── main.py                         # 메인 스크립트 파일
-├── main_tool.py                    # 메인 스크립트 tool 파일
-├── README.md
-├── requirements.txt
-├── .env                            # 환경변수 (gitignore 필요)
-│
-├── core/                           # 추천 알고리즘 로직
-│   ├── recommend_place.py          # 추천 시스템 핵심 클래스
-│   ├── calculate_score.py          # 점수 계산 (거리, 평점, 유사도)
-│   ├── average_latlng.py           # 평균 위치 계산
-│   ├── get_week_index.py           # 주차 계산
-│   ├── haversine.py                # 위경도 거리 계산
-│
-├── models/                         # 모델 및 벡터 관련
-│   ├── mbti_projector.py           # MBTI 점수 → 벡터 변환
-│   ├── extract_mbti_keywords.py    # 벡터 키워드 추출
-│   └── best_mbti_projector.pt      # 저장된 학습 모델(분위기 매핑)
-│
-├── db/                             # DB 연결 및 ORM
-│   ├── db.py                       # DB 세션 유틸
-│   ├── db_models.py                # SQLAlchemy ORM 정의
-│
-├── scripts/                        # 실행 전용 스크립트
-│   ├── run_chroma.py               # Chroma DB 실행용 스크립트
-│   └── sbert_down.py               # SBERT 모델 최초 다운로드용 스크립트
+[사용자 입력: MBTI, 선호음식, 위도/경도]
+               ↓
+     MBTI → 벡터 변환 (mbti_projector.py)
+               ↓
+      점수 계산 (recommend_place.py)
+   • 거리
+   • 평점
+   • MBTI 유사도
+   • 엔트로피 가중치
+               ↓
+    ThreadPoolExecutor 기반 멀티스레딩 처리 (main_tool.py)
+               ↓
+     추천 결과 DB 저장
 ```
 
-## 실행 방법
-
-1. **필요한 패키지 설치**:
+## 설치 방법
 
 ```bash
+# 1) 의존성 설치
 pip install -r requirements.txt
-```
 
-2. **서버 실행**:
-
-```bash
+# 2) ChromaDB 서버 실행
 python scripts/run_chroma.py
+
+# 3) 메인 애플리케이션 실행
 python main.py
 ```
 
-**추천 결과**
+## 사용 예시
 
-```json
+```python
+if __name__ == "__main__":
+    run_batch_recommendation()
+```
+
+## 디렉토리 구조
+
+```
+12-marong-AI-place/
+├── main.py
+├── main_tool.py
+├── requirements.txt
+├── .env                          # 환경변수 (gitignore)
+│
+├── core/                         # 추천 알고리즘 로직
+│   ├── recommend_place.py        # 추천 시스템 핵심 클래스
+│   ├── calculate_score.py        # 점수 계산 (거리, 평점, 유사도, 엔트로피)
+│   ├── average_latlng.py         # 평균 위치 계산
+│   ├── get_week_index.py         # 주차 계산 (주간 트렌드 반영 시 사용)
+│   └── haversine.py              # 위경도 거리 계산
+│
+├── models/                       # MBTI 벡터 변환 및 키워드 추출
+│   ├── mbti_projector.py         # MBTI → 벡터 변환기
+│   ├── extract_mbti_keywords.py  # 키워드 임베딩 추출
+│   └── best_mbti_projector.pt    # 학습된 MBTI 변환 모델
+│
+├── db/                           # DB 연결 및 ORM 정의
+│   ├── db.py                     # SQLAlchemy 세션 유틸
+│   └── db_models.py              # 테이블 정의
+│
+├── scripts/                      # 실행 전용 스크립트
+│   ├── run_chroma.py             # ChromaDB 실행 스크립트
+│   └── sbert_down.py             # SBERT 모델 다운로드 스크립트
+│
+└── README.md
+```
+
+## 핵심 모듈 설명
+
+| 모듈                     | 설명                                          |
+| ------------------------ | --------------------------------------------- |
+| `RecommendPlace`         | 전체 추천 파이프라인을 관리하는 핵심 클래스   |
+| `calculate_score.py`     | 거리·평점·MBTI 유사도·엔트로피 기반 점수 계산 |
+| `mbti_projector.py`      | MBTI 점수를 벡터로 변환                       |
+| `haversine.py`           | 위경도 기반 거리 계산                         |
+| `average_latlng.py`      | 여러 위치의 평균 위경도 계산                  |
+| `db.db` & `db_models.py` | 추천 세션 및 결과 저장을 위한 ORM 정의        |
+
+## 추천 규칙
+
+1. MBTI 벡터 평균 기반 유사도 상위 순 정렬
+2. 평점이 높은 장소 우선 고려
+3. 선호 음식 필터링, 비선호 음식 제외
+4. 거리 점수(가까운 순) 반영
+5. 엔트로피 가중치로 특성별 중요도 보정
+6. 멀티스레딩으로 동시 처리 후 최종 스코어 계산
+
+## 출력 예시
+
+```
 {
   "index": 1,
   "user_id_pair": ["user_001", "manitto_001"],
@@ -71,31 +119,30 @@ python main.py
   "food_data": [
     {
       "name": "비눔",
-      "address": "경기 성남시 분당구 대왕판교로 660 유스페이스1 지하1층 B106호",
+      "address": "경기 성남시 분당구 대왕판교로 660 지하1층 B106",
       "rating": 5.0,
-      "distance": 0.7611726549458185,
+      "distance": 0.76,
       "link": "https://place.map.kakao.com/224825790",
-      "score": 0.6838664493251585,
+      "score": 0.68,
       "category": "양식",
-      "operation_hour": "['월, 화, 수, 목, 금: 11:00~24:00', '토: 18:00~24:00', '일: 휴무일']"
+      "operation_hour": ["월~금: 11:00~24:00", "토: 18:00~24:00"]
     }
   ],
   "cafe_data": [
     {
       "name": "마키아티 판교점",
-      "address": "경기 성남시 분당구 대왕판교로 660 유스페이스1 A동 1층 129호",
+      "address": "경기 성남시 분당구 대왕판교로 660 A동 1층 129호",
       "rating": 5.0,
-      "distance": 0.06639226081065448,
+      "distance": 0.07,
       "link": "https://place.map.kakao.com/1313606369",
-      "score": 0.9663520224032158,
+      "score": 0.97,
       "category": "카페/디저트",
-      "operation_hour": "['월, 화, 수, 목, 금: 08:00~17:00', '토, 일: 휴무일']"
+      "operation_hour": ["월~금: 08:00~17:00"]
     }
   ]
 }
 ```
 
-- MBTI 점수는 `eiScore`, `snScore`, `tfScore`, `jpScore`로 구성되며, 각 점수는 0에서 100 사이의 정수입니다.
-- 위도(`latitude`)와 경도(`longitude`)는 소수점 형태의 실수로 입력받습니다.
-- `likedFoods`와 `dislikedFoods`는 문자열 리스트로 입력받습니다.
-- 장소 추천 결과를 데이터베이스의 `PlaceRecommendationSessions`, `PlaceRecommendations` 테이블에 저장합니다.
+## 향후 확장 방향
+
+- 사용자 피드 분석 기반 장소 추천
