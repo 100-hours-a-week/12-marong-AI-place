@@ -23,7 +23,7 @@ load_dotenv()
 
 base_date = datetime(2025, 1, 6)
 today = datetime.today()
-week_index = GetWeekIndex(today, base_date).get() - 2
+week_index = GetWeekIndex(today, base_date).get()
 
 CHROMA_HOST = os.getenv("CHROMA_HOST")
 CHROMA_PORT = os.getenv("CHROMA_PORT")
