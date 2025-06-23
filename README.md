@@ -40,21 +40,19 @@
 ## 설치 방법
 
 ```bash
-# 1) 의존성 설치
+git clone https://github.com/100-hours-a-week/12-marong-AI-place.git
 pip install -r requirements.txt
-
-# 2) ChromaDB 서버 실행
-python scripts/run_chroma.py
-
-# 3) 메인 애플리케이션 실행
-python main.py
 ```
 
 ## 사용 예시
 
-```python
-if __name__ == "__main__":
-    run_batch_recommendation()
+```bash
+python scripts/run_chroma.py
+# 필요시 실행
+ps aux | grep chroma
+kill 포트번호
+
+python main.py
 ```
 
 ## 디렉토리 구조
