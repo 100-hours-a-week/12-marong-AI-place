@@ -42,7 +42,7 @@
 ```bash
 git clone https://github.com/100-hours-a-week/12-marong-AI-place.git
 pip install -r requirements.txt
-python sbert_down.py
+python scripts/sbert_down.py
 ```
 
 ## 사용 예시
