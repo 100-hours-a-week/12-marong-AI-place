@@ -181,7 +181,7 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         print(f"[완료] user_id: {manitto_id} ↔ manittee_id: {manittee_id}")
 
     except Exception as e:
-        logger.error(f"[ERROR] user_id={pair.manitto_id}, manitto_id={pair.manittee_id} 추천 실패: {e}")
+        logger.error(f"[ERROR] user_id={pair.manitto_id}, manittee_id={pair.manittee_id} 추천 실패: {e}")
         
 # run_batch_recommendation 함수: 장소 추천 실행 함수
 def run_batch_recommendation():
@@ -194,7 +194,7 @@ def run_batch_recommendation():
     finally:
         db.close()
         
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
             executor.submit(process_pair, pair, week_index, chroma_client, embedding_model, mbti_model)
             for pair in pairs

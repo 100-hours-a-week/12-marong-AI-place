@@ -96,7 +96,7 @@ class RecommendPlace:
         except Exception as e:
             logger.error(f"메뉴 임베딩 쿼리 실패: {e}")
             raise RuntimeError(f"메뉴 임베딩 쿼리 실패: {e}")
-
+        
         try:
             score_rows = []
             for metadata, dist in zip(review_results["metadatas"][0], review_results["distances"][0]):
