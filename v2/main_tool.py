@@ -28,10 +28,12 @@ week_index = GetWeekIndex(today, base_date).get()
 CHROMA_HOST = os.getenv("CHROMA_HOST")
 CHROMA_PORT = os.getenv("CHROMA_PORT")
 chroma_client = HttpClient(host=CHROMA_HOST, port=CHROMA_PORT, ssl=False)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 embedding_model = SentenceTransformer("./kr-sbert")
 mbti_model = MBTIProjector()
-mbti_model.load_state_dict(torch.load("./models/best_mbti_projector.pt", map_location="cpu"))
+mbti_model.load_state_dict(torch.load("./models/best_mbti_projector.pt", map_location=device))
+mbti_model.to(device)
 mbti_model.eval()
 
 # Chroma DB 검색 함수
@@ -112,7 +114,9 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
             chroma_client=chroma_client,
             review_col_name="review_collection",
             menu_col_name="menu_collection",
-            allow_cafe=False
+            device=device,
+            allow_cafe=False,
+            embedding_func=None
         )
 
         cafe_recommender = RecommendPlace(
@@ -122,7 +126,9 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
             chroma_client=chroma_client,
             review_col_name="review_collection",
             menu_col_name="menu_collection",
-            allow_cafe=True
+            device=device,
+            allow_cafe=True,
+            embedding_func=None
         )
 
         food_results = food_recommender.recommend(avg_lat, avg_lng, 10, 5, like_foods, dislike_foods)
@@ -162,7 +168,8 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
             history_metas = [{
                 "week": week_index,
                 "user_id": uid,
-                "manitto_id": manitto_id if uid == manittee_id else manittee_id,
+                "manitto_id": manitto_id,
+                "manitte_id": manittee_id,
                 "place_name": place.get("name"),
                 "category": place.get("category"),
                 "opening_hours": place.get("operation_hour"),

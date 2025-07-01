@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 
 class RecommendPlace:
     def __init__(self, model, embedding_model, mbti_vector, chroma_client,
-                 review_col_name, menu_col_name, allow_cafe=True, embedding_func=None):
-        self.model = model.eval()
+                 review_col_name, menu_col_name, device, allow_cafe=True, embedding_func=None):
+        self.device = device
+        self.model = model.to(self.device).eval()
+        self.embedding_model = embedding_model.to(self.device)
         self.allow_cafe = allow_cafe
-        self.embedding_model = embedding_model
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # 예외 처리: Chroma 컬렉션 초기화
         try:
@@ -36,15 +36,16 @@ class RecommendPlace:
         try:
             mbti_keywords = ExtractMBTIKeywords().extract(mbti_vector)
             if not mbti_keywords:
-                self.user_vibe = torch.zeros((1, 768)).numpy()
+                self.user_vibe = torch.zeros((1, 768), device=self.device).numpy()
                 return
 
-            keyword_embs = [self.embedding_model.encode(k, convert_to_tensor=True) for k in mbti_keywords]
-            mbti_tensor = F.normalize(torch.stack(keyword_embs).mean(dim=0, keepdim=True), dim=1).to(self.device)
+            keyword_embs = [self.embedding_model.encode(k, convert_to_tensor=True, device=self.device).to(self.device) for k in mbti_keywords]
+            mbti_tensor = F.normalize(torch.stack(keyword_embs).mean(dim=0, keepdim=True), dim=1)
 
             with torch.no_grad():
                 projected = self.model(mbti_tensor)
                 self.user_vibe = F.normalize(projected, dim=1).cpu().numpy()
+                self.user_vibe_tensor = torch.tensor(self.user_vibe, device=self.device)
         except Exception as e:
             logger.error(f"MBTI 키워드 임베딩 또는 투영 실패: {e}")
             raise RuntimeError(f"MBTI 키워드 임베딩 또는 투영 실패: {e}")
@@ -60,14 +61,14 @@ class RecommendPlace:
         try:
             food_embs = []
             for food in like_foods:
-                food_embs.append(1.5 * self.embedding_model.encode(food, convert_to_tensor=True))
+                food_embs.append(1.5 * self.embedding_model.encode(food, convert_to_tensor=True, device=self.device))
             for food in dislike_foods:
-                food_embs.append(-4.5 * self.embedding_model.encode(food, convert_to_tensor=True))
+                food_embs.append(-4.5 * self.embedding_model.encode(food, convert_to_tensor=True, device=self.device))
 
             if food_embs:
                 food_tensor = F.normalize(torch.stack(food_embs).mean(dim=0, keepdim=True), dim=1).to(self.device)
                 user_pref_vector = F.normalize(
-                    torch.tensor(self.user_vibe, device=self.device) + food_tensor, dim=1
+                    self.user_vibe_tensor + food_tensor, dim=1
                 ).cpu().numpy()
             else:
                 user_pref_vector = self.user_vibe
