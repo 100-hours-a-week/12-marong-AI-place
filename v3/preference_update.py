@@ -69,6 +69,7 @@ for user_id in user_ids:
   rows = db.execute(stmt).all()  
   
   for placelike_id, place_name in rows:
+    chroma_placelike_id = f"like_{placelike_id}"
     # review_collection 처리
     try:
         review_result = review_collection.get(
@@ -78,7 +79,7 @@ for user_id in user_ids:
         )
         
         vibe_like_history = vlikes_history_collection.get(
-            where={"like_id": placelike_id},
+            where={"like_id": chroma_placelike_id},
             include=["metadata"],
             limit=1
         )
@@ -91,7 +92,7 @@ for user_id in user_ids:
         )
         
         menu_like_history = mlikes_history_collection.get(
-            where={"like_id": placelike_id},
+            where={"like_id": chroma_placelike_id},
             include=["metadata"],
             limit=1
         )
@@ -110,12 +111,12 @@ for user_id in user_ids:
             menu_embed_vector += 0.01 * menu_vec
             
             vlikes_history_collection.add(
-                ids=[f"like_{placelike_id}"],
+                ids=[chroma_placelike_id],
                 metadatas=[{"user_id": user_id, "place_name": place_name}]
             )
             
             mlikes_history_collection.add(
-                ids=[f"like_{placelike_id}"],
+                ids=[chroma_placelike_id],
                 metadatas=[{"user_id": user_id, "place_name": place_name}]
             )
             
