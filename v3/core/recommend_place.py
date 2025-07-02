@@ -11,35 +11,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 class RecommendPlace:
-    def __init__(self, model, embedding_model, user_id, mbti_vector, chroma_client,
-                 review_col_name, menu_col_name, vibelike_col_name, menulike_col_name, device, allow_cafe=True, embedding_func=None):
+    def __init__(self, model, embedding_model, mbti_vector, vibe_vector, menu_vector, chroma_client,
+                 review_col_name, menu_col_name, device, allow_cafe=True, embedding_func=None):
         self.device = device
         self.model = model.to(self.device).eval()
         self.embedding_model = embedding_model.to(self.device)
         self.allow_cafe = allow_cafe
-        self.user_id = user_id
-
-        # 예외 처리: Chroma 컬렉션 초기화
-        try:
-            self.review_collection = chroma_client.get_or_create_collection(
-                name=review_col_name,
-                embedding_function=None
-            )
-            self.menu_collection = chroma_client.get_or_create_collection(
-                name=menu_col_name,
-                embedding_function=None
-            )
-            self.vibelike_collection = chroma_client.get_or_create_collection(
-                name=vibelike_col_name,
-                embedding_function=None
-            )
-            self.menulike_collection = chroma_client.get_or_create_collection(
-                name=menulike_col_name,
-                embedding_function=None
-            )
-        except Exception as e:
-            logger.error(f"Chroma 컬렉션 초기화 실패: {e}")
-            raise RuntimeError(f"Chroma 컬렉션 초기화 실패: {e}")
+        self.menu_vector = menu_vector
+        self.review_collection = chroma_client.get_or_create_collection(name=review_col_name)
+        self.menu_collection = chroma_client.get_or_create_collection(name=menu_col_name)
 
         # 예외 처리: MBTI 키워드 임베딩 및 투영
         try:
@@ -55,36 +35,10 @@ class RecommendPlace:
                 projected = self.model(mbti_tensor)
                 self.user_vibe = F.normalize(projected, dim=1).cpu().numpy()
                 self.user_vibe_tensor = torch.tensor(self.user_vibe, device=self.device)
+                self.vibe_vector = F.normalize(0.7 * self.user_vibe_tensor + 0.3 * vibe_vector, dim=1).cpu.numpy()
         except Exception as e:
-            logger.error(f"MBTI 키워드 임베딩 또는 투영 실패: {e}")
-            raise RuntimeError(f"MBTI 키워드 임베딩 또는 투영 실패: {e}")
-        
-        try:
-            vibe_preference_result = self.vibelike_collection.query(
-                ids=[f"user_{self.user_id}"],
-                include=["embeddings"],
-                limit=1
-            )
-            vibe_preference_vector = torch.tensor(vibe_preference_result["embeddings"][0], device=self.device)
-        except Exception as e:
-            logger.error(f"유저 선호 임베딩 벡터 검색 실패: {e}")
-            raise RuntimeError(f"유저 선호 임베딩 벡터 검색 실패: {e}")
-        
-        try:
-            menu_preference_result = self.menulike_collection.query(
-                ids=[f"user_{self.user_id}"],
-                include=["embeddings"],
-                limit=1
-            )
-            self.menu_preference_vector = torch.tensor(menu_preference_result["embeddings"][0], device=self.device)
-        except Exception as e:
-            logger.error(f"유저 선호 임베딩 벡터 검색 실패: {e}")
-            raise RuntimeError(f"유저 선호 임베딩 벡터 검색 실패: {e}")
-        
-        # 두 벡터 torch로 변환 후 normalize
-        combined_vector = 0.6 * self.user_vibe + 0.4 * vibe_preference_vector
-        combined_tensor = torch.tensor(combined_vector, device=self.device).unsqueeze(0)
-        self.vibe_pref_vector = F.normalize(combined_tensor, dim=1).cpu().numpy()
+            logger.error(f"MBTI 키워드 임베딩 및 분위기 벡터 생성 실패: {e}")
+            raise RuntimeError(f"MBTI 키워드 임베딩 및 분위기 벡터 생성 실패: {e}")
         
 
     def calculate_entropy_weights(self, df):
@@ -104,12 +58,11 @@ class RecommendPlace:
 
             if food_embs:
                 food_tensor = F.normalize(torch.stack(food_embs).mean(dim=0, keepdim=True), dim=1).to(self.device)
-                food_tensor = 0.7 * food_tensor + 0.3 * self.menu_preference_vector
-                self.menu_pref_vector = F.normalize(food_tensor, dim=1).cpu().numpy()
+                self.menu_pref_vector = F.normalize(food_tensor, dim=1)
             else:
                 self.menu_pref_vector = torch.tensor(np.zeros(768), device=self.device).unsqueeze(0)
                 
-            self.menu_pref_vector = self.menu_pref_vector
+            self.menu_vector = F.normalize(0.7 * self.menu_pref_vector + 0.3 * self.menu_vector, dim=1).cpu().numpy()
         except Exception as e:
             logger.error(f"선호 음식 벡터 계산 실패: {e}")
             raise RuntimeError(f"선호 음식 벡터 계산 실패: {e}")
@@ -118,7 +71,7 @@ class RecommendPlace:
             top_k_each = int(700)
 
             review_results = self.review_collection.query(
-                query_embeddings=self.vibe_pref_vector,
+                query_embeddings=self.vibe_vector,
                 n_results=top_k_each,
                 include=["metadatas", "distances", "documents"]
             )
@@ -128,7 +81,7 @@ class RecommendPlace:
 
         try:
             menu_results = self.menu_collection.query(
-                query_embeddings=self.menu_pref_vector,
+                query_embeddings=self.menu_vector,
                 n_results=top_k_each,
                 include=["metadatas", "distances", "documents"]
             )
@@ -163,7 +116,7 @@ class RecommendPlace:
 
             def process_results(results, weight, Flag, T):
                 for metadata, distance in zip(results.get("metadatas", [[]])[0], results.get("distances", [[]])[0]):
-                    store_id = metadata.get("상호명", "")
+                    store_name = metadata.get("상호명", "")
                     rating = float(metadata.get("평균별점", 0))
                     lat_p, lng_p = metadata.get("위도"), metadata.get("경도")
 
@@ -182,11 +135,11 @@ class RecommendPlace:
 
                     score = CalculateScore(rating, dist, sim_score, radius_km, weights).calculate() * weight
 
-                    if store_id in scored:
-                        scored[store_id]["score"] += score
+                    if store_name in scored:
+                        scored[store_name]["score"] += score
                     else:
-                        scored[store_id] = {
-                            "name": store_id,
+                        scored[store_name] = {
+                            "name": store_name,
                             "address": metadata.get("주소", ""),
                             "rating": rating,
                             "distance": dist,

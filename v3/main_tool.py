@@ -37,30 +37,70 @@ mbti_model.to(device)
 mbti_model.eval()
 
 # Chroma DB 검색 함수
-def get_chroma_mbti(chroma_client, user_id):
-    collection = chroma_client.get_or_create_collection(name="user_latest")
-    user_doc = collection.get(where={"user_id": user_id}, include=["metadatas"])
+def get_chroma_preference(chroma_client, user_id):
+    vibelike_collection = chroma_client.get_or_create_collection(name="vibelike_collection")
+    menulike_collection = chroma_client.get_or_create_collection(name="menulike_collection")
+    
+    vibe_preference_result = vibelike_collection.query(
+        ids=[f"user_{user_id}"],
+        include=["embeddings"],
+        limit=1
+    )
+    
+    vibe_embeddings = vibe_preference_result.get("embeddings", [])
 
-    try:
-        if not user_doc:
-            raise ValueError("MBTI 정보가 하나 이상 존재하지 않음")
-        user_data = user_doc["metadatas"][0]
-        
-        return {'ei_score': user_data['ei_score'], 
-                'sn_score': user_data['sn_score'],
-                'tf_score': user_data['tf_score'],
-                'jp_score': user_data['jp_score']}
+    if vibe_embeddings:
+        # 이미 저장된 벡터가 있으면 그걸 사용
+        user_vibe_embedding = vibe_embeddings[0]
+    else:
+        # 없으면 더미 벡터 생성
+        EMBEDDING_DIM = 768
+        dummy_embedding = [0.0] * EMBEDDING_DIM
 
-    except Exception as e:
-        logger.warning(
-            f"[ChromaDB 조회 실패] user_id={user_id}, error={e} → 백엔드 DB에서 재조회 시도"
+        # 3) 컬렉션에 add
+        vibelike_collection.add(
+            ids=[f"user_{user_id}"],
+            embeddings=[dummy_embedding],
+            metadatas=[{"user_id": user_id}],
+            documents=[""]
         )
-        return None
+
+        # 4) 더미 벡터를 사용
+        user_vibe_embedding = dummy_embedding
+        
+    menu_preference_result = menulike_collection.query(
+        ids=[f"user_{user_id}"],
+        include=["embeddings"],
+        limit=1
+    )
+    
+    menu_embeddings = menu_preference_result.get("embeddings", [])
+
+    if menu_embeddings:
+        # 이미 저장된 벡터가 있으면 그걸 사용
+        user_menu_embedding = menu_embeddings[0]
+    else:
+        # 없으면 더미 벡터 생성
+        EMBEDDING_DIM = 768
+        dummy_embedding = [0.0] * EMBEDDING_DIM
+
+        # 3) 컬렉션에 add
+        menulike_collection.add(
+            ids=[f"user_{user_id}"],
+            embeddings=[dummy_embedding],
+            metadatas=[{"user_id": user_id}],
+            documents=[""]
+        )
+
+        # 4) 더미 벡터를 사용
+        user_menu_embedding = dummy_embedding
+        
+    return user_vibe_embedding, user_menu_embedding
 
 # User 정보 데이터 구축 함수
 def build_user_input(user_id: int, lat: float, lng: float, db: Session):
-    user_chroma_mbti = get_chroma_mbti(chroma_client, user_id)
-    mbti = user_chroma_mbti if user_chroma_mbti else db.query(SurveyMBTI).filter(SurveyMBTI.user_id == user_id).first()
+    vibe_preference, menu_preference = get_chroma_preference(chroma_client, user_id)
+    mbti = db.query(SurveyMBTI).filter(SurveyMBTI.user_id == user_id).first()
     liked = db.query(SurveyLikedFood).filter(SurveyLikedFood.user_id == user_id).all()
     disliked = db.query(SurveyDislikedFood).filter(SurveyDislikedFood.user_id == user_id).all()
     
@@ -68,10 +108,12 @@ def build_user_input(user_id: int, lat: float, lng: float, db: Session):
         raise ValueError(f"MBTI 정보가 없습니다: user_id={user_id}")
     return {
         "id": user_id,
-        "eiScore": mbti['ei_score'] if user_chroma_mbti else mbti.ei_score,
-        "snScore": mbti['sn_score'] if user_chroma_mbti else mbti.sn_score,
-        "tfScore": mbti['tf_score'] if user_chroma_mbti else mbti.tf_score,
-        "jpScore": mbti['jp_score'] if user_chroma_mbti else mbti.jp_score,
+        "eiScore": mbti.ei_score,
+        "snScore": mbti.sn_score,
+        "tfScore": mbti.tf_score,
+        "jpScore": mbti.jp_score,
+        "vibe_preference": vibe_preference,
+        "menu_preference": menu_preference,
         "latitude": lat,
         "longitude": lng,
         "likedFoods": [x.food_name for x in liked],
@@ -79,13 +121,18 @@ def build_user_input(user_id: int, lat: float, lng: float, db: Session):
     }
 
 # 마니또, 마니띠 성향 평균 함수
-def get_avg_vector(me, manittee):
-    return [
+def get_mbti_avg_vector(me, manittee):
+    return torch.tensor([
         (me['eiScore'] + manittee['eiScore']) / 2,
         (me['snScore'] + manittee['snScore']) / 2,
         (me['tfScore'] + manittee['tfScore']) / 2,
         (me['jpScore'] + manittee['jpScore']) / 2
-    ]
+    ], device=device)
+    
+def get_preference_mbti_vector(me, manittee):
+    vibe_pavg_vector = (torch.tensor(me['vibe_preference'], device=device) + torch.tensor(manittee['vibe_preference'], device=device)) / 2
+    menu_pavg_vector = (torch.tensor(me['menu_preference'], device=device) + torch.tensor(manittee['menu_preference'], device=device)) / 2
+    return vibe_pavg_vector, menu_pavg_vector
 
 # process_pair 함수: DB 업로드 함수
 def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
@@ -98,7 +145,9 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
 
         me = build_user_input(manitto_id, lat, lng, db)
         manittee = build_user_input(manittee_id, lat, lng, db)
-        avg_vector = get_avg_vector(me, manittee)
+        
+        mbti_avg_vector = get_mbti_avg_vector(me, manittee)
+        vibe_pavg_vector, menu_pavg_vector = get_preference_mbti_vector(me, manittee)
 
         average_loc = AverageLatLng(lat, lng, lat, lng)
         average_loc.loc_to_vec()
@@ -110,7 +159,9 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         food_recommender = RecommendPlace(
             model=mbti_model,
             embedding_model=embedding_model,
-            mbti_vector=avg_vector,
+            mbti_vector=mbti_avg_vector,
+            vibe_vector=vibe_pavg_vector,
+            menu_vector=menu_pavg_vector,
             chroma_client=chroma_client,
             review_col_name="review_collection",
             menu_col_name="menu_collection",
@@ -122,7 +173,8 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         cafe_recommender = RecommendPlace(
             model=mbti_model,
             embedding_model=embedding_model,
-            mbti_vector=avg_vector,
+            vibe_vector=vibe_pavg_vector,
+            menu_vector=menu_pavg_vector,
             chroma_client=chroma_client,
             review_col_name="review_collection",
             menu_col_name="menu_collection",
