@@ -5,6 +5,7 @@ from db.db import SessionLocal
 from db.db_models import (
     PlaceLikes, PlaceRecommendations
 )
+from collections import Counter
 from sqlalchemy import select, func
 import torch.nn.functional as F
 import torch
@@ -21,6 +22,9 @@ CHROMA_PORT = os.getenv("CHROMA_PORT")
 chroma_client = HttpClient(host=CHROMA_HOST, port=CHROMA_PORT, ssl=False)
 vibelikes_collection = chroma_client.get_or_create_collection(name="vibelikes_collections")
 menulikes_collection = chroma_client.get_or_create_collection(name="menulikes_collections")
+vlikes_history_collection = chroma_client.get_or_create_collection(name="vlikes_history_collections")
+mlikes_history_collection = chroma_client.get_or_create_collection(name="mlikes_history_collections")
+
 review_collection = chroma_client.get_or_create_collection(name="review_collections")
 menu_collection = chroma_client.get_or_create_collection(name="menu_collections")
 
@@ -53,19 +57,18 @@ for user_id in user_ids:
       menu_embed_vector = np.array(menu_doc["embeddings"][0])
 
   stmt = (
-    select(PlaceRecommendations.name, func.count(PlaceLikes.id).label("like_count"))
+    select(PlaceLikes.id, PlaceRecommendations.name)
     .join(PlaceRecommendations, PlaceLikes.place_id == PlaceRecommendations.id)
     .where(
         PlaceLikes.user_id == user_id,
         start <= PlaceLikes.created_at,
         end > PlaceLikes.created_at
     )
-    .group_by(PlaceLikes.place_id)
   )
   
-  rows = db.execute(stmt).all()
+  rows = db.execute(stmt).all()  
   
-  for place_name, place_count in rows:
+  for placelike_id, place_name in rows:
     # review_collection 처리
     try:
         review_result = review_collection.get(
@@ -73,27 +76,59 @@ for user_id in user_ids:
             include=["embeddings"],
             limit=1
         )
-        if review_result.get("embeddings"):
-            place_vec = np.array(review_result["embeddings"][0])
-            vibe_embed_vector += place_count * 0.01 * place_vec
-    except Exception as e:
-        logger.warning(f"{place_name} 에 대한 임베딩 검색 실패: {e}")
-
+        
+        vibe_like_history = vlikes_history_collection.get(
+            where={"like_id": placelike_id},
+            include=["metadata"],
+            limit=1
+        )
+    
     # menu_collection 처리
-    try:
         menu_result = menu_collection.get(
             where={"name": place_name},
             include=["embeddings"],
             limit=1
         )
-        if menu_result.get("embeddings"):
-            place_vec = np.array(menu_result["embeddings"][0])
-            menu_embed_vector += place_count * 0.01 * place_vec
+        
+        menu_like_history = mlikes_history_collection.get(
+            where={"like_id": placelike_id},
+            include=["metadata"],
+            limit=1
+        )
+        
+        condition1 = (review_result.get("embeddings") and len(review_result["embeddings"]) > 0 and 
+                        vibe_like_history.get("metadata") and len(vibe_like_history["metadata"]) == 0)
+        
+        condition2 = (menu_result.get("embeddings") and len(menu_result["embeddings"]) > 0 and
+                        menu_like_history.get("metadata") and len(menu_like_history["metadata"]) == 0)
+        
+        if condition1 and condition2:
+            vibe_vec = np.array(review_result["embeddings"][0])
+            menu_vec = np.array(menu_result["embeddings"][0])
+                                
+            vibe_embed_vector += 0.01 * vibe_vec
+            menu_embed_vector += 0.01 * menu_vec
+            
+            vlikes_history_collection.add(
+                ids=[f"like_{placelike_id}"],
+                metadatas=[{"user_id": user_id, "place_name": place_name}]
+            )
+            
+            mlikes_history_collection.add(
+                ids=[f"like_{placelike_id}"],
+                metadatas=[{"user_id": user_id, "place_name": place_name}]
+            )
+            
     except Exception as e:
         logger.warning(f"{place_name} 에 대한 임베딩 검색 실패: {e}")
   
-  vibe_embed_vector = F.normalize(torch.tensor(vibe_embed_vector), dim=0).numpy()
-  menu_embed_vector = F.normalize(torch.tensor(menu_embed_vector), dim=0).numpy()
+  v_tensor = torch.tensor(vibe_embed_vector, dtype=torch.float32)
+  if torch.norm(v_tensor) > 0:
+    vibe_embed_vector = F.normalize(v_tensor, dim=0).numpy()
+
+  m_tensor = torch.tensor(menu_embed_vector, dtype=torch.float32)
+  if torch.norm(m_tensor) > 0:
+    menu_embed_vector = F.normalize(m_tensor, dim=0).numpy()
   
   vibelikes_collection.upsert(
         ids=[chroma_user_id],
