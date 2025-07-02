@@ -79,8 +79,8 @@ for user_id in user_ids:
         )
         
         vibe_like_history = vlikes_history_collection.get(
-            where={"like_id": chroma_placelike_id},
-            include=["metadata"],
+            ids=[chroma_placelike_id],
+            include=["ids", "metadatas"],
             limit=1
         )
     
@@ -92,16 +92,16 @@ for user_id in user_ids:
         )
         
         menu_like_history = mlikes_history_collection.get(
-            where={"like_id": chroma_placelike_id},
-            include=["metadata"],
+            ids=[chroma_placelike_id],
+            include=["ids", "metadatas"],
             limit=1
         )
         
         condition1 = (review_result.get("embeddings") and len(review_result["embeddings"]) > 0 and 
-                        vibe_like_history.get("metadata") and len(vibe_like_history["metadata"]) == 0)
+                        len(vibe_like_history["ids"]) == 0)
         
         condition2 = (menu_result.get("embeddings") and len(menu_result["embeddings"]) > 0 and
-                        menu_like_history.get("metadata") and len(menu_like_history["metadata"]) == 0)
+                        len(menu_like_history["ids"]) == 0)
         
         if condition1 and condition2:
             vibe_vec = np.array(review_result["embeddings"][0])
