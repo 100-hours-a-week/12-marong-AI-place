@@ -23,7 +23,7 @@ load_dotenv()
 
 base_date = datetime(2025, 1, 6)
 today = datetime.today()
-week_index = GetWeekIndex(today, base_date).get()
+week_index = GetWeekIndex(today, base_date).get() - 1
 
 CHROMA_HOST = os.getenv("CHROMA_HOST")
 CHROMA_PORT = os.getenv("CHROMA_PORT")
@@ -38,18 +38,20 @@ mbti_model.eval()
 
 # Chroma DB 검색 함수
 def get_chroma_preference(chroma_client, user_id):
-    vibelike_collection = chroma_client.get_or_create_collection(name="vibelike_collection")
-    menulike_collection = chroma_client.get_or_create_collection(name="menulike_collection")
+    vibelikes_collection = chroma_client.get_or_create_collection(name="vibelikes_collection")
+    menulikes_collection = chroma_client.get_or_create_collection(name="menulikes_collection")
     
-    vibe_preference_result = vibelike_collection.query(
-        ids=[f"user_{user_id}"],
+    chroma_user_id = f"user_{user_id}"
+    
+    vibe_preference_result = vibelikes_collection.get(
+        ids=[chroma_user_id],
         include=["embeddings"],
         limit=1
     )
     
-    vibe_embeddings = vibe_preference_result.get("embeddings", [])
+    vibe_embeddings = vibe_preference_result["embeddings"]
 
-    if vibe_embeddings:
+    if len(vibe_embeddings) > 0:
         # 이미 저장된 벡터가 있으면 그걸 사용
         user_vibe_embedding = vibe_embeddings[0]
     else:
@@ -58,25 +60,25 @@ def get_chroma_preference(chroma_client, user_id):
         dummy_embedding = [0.0] * EMBEDDING_DIM
 
         # 3) 컬렉션에 add
-        vibelike_collection.add(
-            ids=[f"user_{user_id}"],
+        vibelikes_collection.add(
+            ids=[chroma_user_id],
             embeddings=[dummy_embedding],
             metadatas=[{"user_id": user_id}],
-            documents=[""]
+            documents=["user vibe preference record"]
         )
 
         # 4) 더미 벡터를 사용
         user_vibe_embedding = dummy_embedding
         
-    menu_preference_result = menulike_collection.query(
+    menu_preference_result = menulikes_collection.get(
         ids=[f"user_{user_id}"],
         include=["embeddings"],
         limit=1
     )
     
-    menu_embeddings = menu_preference_result.get("embeddings", [])
+    menu_embeddings = menu_preference_result["embeddings"]
 
-    if menu_embeddings:
+    if len(menu_embeddings) > 0:
         # 이미 저장된 벡터가 있으면 그걸 사용
         user_menu_embedding = menu_embeddings[0]
     else:
@@ -85,11 +87,11 @@ def get_chroma_preference(chroma_client, user_id):
         dummy_embedding = [0.0] * EMBEDDING_DIM
 
         # 3) 컬렉션에 add
-        menulike_collection.add(
-            ids=[f"user_{user_id}"],
+        menulikes_collection.add(
+            ids=[chroma_user_id],
             embeddings=[dummy_embedding],
             metadatas=[{"user_id": user_id}],
-            documents=[""]
+            documents=["user menu preference record"]
         )
 
         # 4) 더미 벡터를 사용
@@ -173,6 +175,7 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         cafe_recommender = RecommendPlace(
             model=mbti_model,
             embedding_model=embedding_model,
+            mbti_vector=mbti_avg_vector,
             vibe_vector=vibe_pavg_vector,
             menu_vector=menu_pavg_vector,
             chroma_client=chroma_client,
@@ -191,7 +194,7 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         for uid in [manitto_id]:
             session_entry = PlaceRecommendationSessions(
                 manitto_id=uid,
-                manittee_id=manittee_id if uid == manitto_id else manitto_id,
+                manittee_id=manittee_id,
                 week=week_index
             )
             db.add(session_entry)

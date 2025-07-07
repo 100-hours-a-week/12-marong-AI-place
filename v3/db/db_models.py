@@ -1,6 +1,7 @@
-from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey, Text, DECIMAL, Boolean, UniqueConstraint
+from sqlalchemy import Column, BigInteger, Integer, String, ForeignKey, Text, DECIMAL, Boolean, UniqueConstraint, TIMESTAMP
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 
 Base = declarative_base()
 
@@ -18,7 +19,8 @@ class Users(Base):
     has_completed_survey = Column(Boolean, default=False)
 
     # 관계 설정
-    groups = relationship("UserGroups", back_populates="user")
+    usergroups = relationship("UserGroups", back_populates="users")
+    place_likes = relationship("PlaceLikes", back_populates="users_2")
 
 
 # Groups
@@ -32,7 +34,7 @@ class Groups(Base):
     image_url = Column(Text)
 
     # 관계 설정
-    users = relationship("UserGroups", back_populates="group")
+    usergroups_2 = relationship("UserGroups", back_populates="groups")
 
 
 # UserGroups
@@ -44,8 +46,8 @@ class UserGroups(Base):
     group_id = Column(BigInteger, ForeignKey("Groups.id", ondelete="CASCADE"), nullable=False)
 
     # 관계 매핑
-    user = relationship("Users", back_populates="groups")
-    group = relationship("Groups", back_populates="users")
+    users = relationship("Users", back_populates="usergroups")
+    groups = relationship("Groups", back_populates="usergroups_2")
 
     __table_args__ = (
         UniqueConstraint("user_id", "group_id", name="uq_user_group"),
@@ -79,11 +81,11 @@ class PlaceRecommendationSessions(Base):
     manittee_id = Column(BigInteger, ForeignKey("Users.id"), nullable=False)
     week = Column(Integer, nullable=False)
 
-    recommendations = relationship("PlaceRecommendations", back_populates="session")
+    place_recommendations = relationship("PlaceRecommendations", back_populates="place_recommendation_sessions")
 
 class PlaceRecommendations(Base):
     __tablename__ = "PlaceRecommendations"
-    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    id = Column(BigInteger, ForeignKey("PlaceLikes.place_recommendation_id", ondelete="CASCADE"), primary_key=True, autoincrement=True, nullable=False)
     session_id = Column(BigInteger, ForeignKey("PlaceRecommendationSessions.id"), nullable=False)
     type = Column(String(20), nullable=False)  # 'cafe' or 'restaurant'
     name = Column(String(150), nullable=False)
@@ -93,7 +95,13 @@ class PlaceRecommendations(Base):
     latitude = Column(DECIMAL(10, 7))
     longitude = Column(DECIMAL(10, 7))
 
-    session = relationship("PlaceRecommendationSessions", back_populates="recommendations")
+    place_recommendation_sessions = relationship("PlaceRecommendationSessions", back_populates="place_recommendations")
+    place_likes_2 = relationship(
+    "PlaceLikes",
+    back_populates="place_recommendations_2",
+    foreign_keys="[PlaceLikes.place_recommendation_id]"
+    )
+
     
 # Manittos
 class Manittos(Base):
@@ -104,3 +112,23 @@ class Manittos(Base):
     manitto_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
     manittee_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), nullable=False)
     week = Column(Integer, nullable=False)
+    
+    
+class PlaceLikes(Base):
+    __tablename__ = "PlaceLikes"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True, nullable=False)
+    user_id = Column(BigInteger, ForeignKey("Users.id", ondelete="CASCADE"), index=True, nullable=False)
+    place_recommendation_id = Column(BigInteger, ForeignKey("PlaceRecommendations.id", ondelete="CASCADE"), index=True, nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    
+    users_2 = relationship("Users", back_populates="place_likes")
+    place_recommendations_2 = relationship(
+    "PlaceRecommendations",
+    back_populates="place_likes_2",
+    foreign_keys=[place_recommendation_id]
+    )
+    
+    __table_args__ = (
+        UniqueConstraint("user_id", "place_recommendation_id", name="unique_user_place_like"),
+    )

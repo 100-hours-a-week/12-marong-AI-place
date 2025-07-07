@@ -35,7 +35,7 @@ class RecommendPlace:
                 projected = self.model(mbti_tensor)
                 self.user_vibe = F.normalize(projected, dim=1).cpu().numpy()
                 self.user_vibe_tensor = torch.tensor(self.user_vibe, device=self.device)
-                self.vibe_vector = F.normalize(0.7 * self.user_vibe_tensor + 0.3 * vibe_vector, dim=1).cpu.numpy()
+                self.vibe_vector = F.normalize(0.7 * self.user_vibe_tensor + 0.3 * vibe_vector, dim=1).cpu().numpy()
         except Exception as e:
             logger.error(f"MBTI 키워드 임베딩 및 분위기 벡터 생성 실패: {e}")
             raise RuntimeError(f"MBTI 키워드 임베딩 및 분위기 벡터 생성 실패: {e}")
