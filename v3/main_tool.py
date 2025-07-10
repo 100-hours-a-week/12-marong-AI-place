@@ -5,7 +5,6 @@ from datetime import datetime
 from uuid import uuid4
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from db.db import SessionLocal
 from db.db_models import (
     SurveyMBTI, SurveyLikedFood, SurveyDislikedFood,
@@ -23,7 +22,7 @@ load_dotenv()
 
 base_date = datetime(2025, 1, 6)
 today = datetime.today()
-week_index = GetWeekIndex(today, base_date).get()
+week_index = GetWeekIndex(today, base_date).get() - 1
 
 CHROMA_HOST = os.getenv("CHROMA_HOST")
 CHROMA_PORT = os.getenv("CHROMA_PORT")
@@ -256,17 +255,11 @@ def run_batch_recommendation():
     finally:
         db.close()
         
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [
-            executor.submit(process_pair, pair, week_index, chroma_client, embedding_model, mbti_model)
-            for pair in pairs
-        ]
-
-        for future in as_completed(futures):
-            try:
-                future.result()
-            except Exception as e:
-                logger.error(f"[ERROR] 추천 처리 실패: {e}")
+    for pair in pairs:
+        try:
+            process_pair(pair, week_index, chroma_client, embedding_model, mbti_model)
+        except Exception as e:
+            logger.error(f"[ERROR] 추천 처리 실패: {e}")
 
     end_time = datetime.now()
     elapsed = end_time - start_time
