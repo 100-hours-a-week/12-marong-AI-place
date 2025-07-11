@@ -1,7 +1,7 @@
 import os
 import logging
 from dotenv import load_dotenv
-from main_tool import run_batch_recommendation
+from core.recommend_tool import run_batch_recommendation
 
 # 로그 설정
 logger = logging.getLogger("uvicorn.error")
