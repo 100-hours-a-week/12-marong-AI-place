@@ -16,13 +16,15 @@ from models.mbti_projector import MBTIProjector
 from chromadb import HttpClient
 from core.get_week_index import GetWeekIndex
 from core.average_latlng import AverageLatLng
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger("uvicorn.error")
 load_dotenv()
 
 base_date = datetime(2025, 1, 6)
 today = datetime.today()
-week_index = GetWeekIndex(today, base_date).get()
+week_index = GetWeekIndex(today, base_date).get() - 3
+print(week_index)
 
 CHROMA_HOST = os.getenv("CHROMA_HOST")
 CHROMA_PORT = os.getenv("CHROMA_PORT")
@@ -121,20 +123,6 @@ def build_user_input(user_id: int, lat: float, lng: float, db: Session):
         "dislikedFoods": [x.food_name for x in disliked]
     }
 
-# 마니또, 마니띠 성향 평균 함수
-def get_mbti_avg_vector(me, manittee):
-    return torch.tensor([
-        (me['eiScore'] + manittee['eiScore']) / 2,
-        (me['snScore'] + manittee['snScore']) / 2,
-        (me['tfScore'] + manittee['tfScore']) / 2,
-        (me['jpScore'] + manittee['jpScore']) / 2
-    ], device=device)
-    
-def get_preference_mbti_vector(me, manittee):
-    vibe_pavg_vector = (torch.tensor(me['vibe_preference'], device=device) + torch.tensor(manittee['vibe_preference'], device=device)) / 2
-    menu_pavg_vector = (torch.tensor(me['menu_preference'], device=device) + torch.tensor(manittee['menu_preference'], device=device)) / 2
-    return vibe_pavg_vector, menu_pavg_vector
-
 # process_pair 함수: DB 업로드 함수
 def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
     db = SessionLocal()
@@ -147,8 +135,12 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         me = build_user_input(manitto_id, lat, lng, db)
         manittee = build_user_input(manittee_id, lat, lng, db)
         
-        mbti_avg_vector = get_mbti_avg_vector(me, manittee)
-        vibe_pavg_vector, menu_pavg_vector = get_preference_mbti_vector(me, manittee)
+        me_mbti_vector = torch.tensor([me['eiScore'], me['snScore'], me['tfScore'], me['jpScore']], device=device, dtype=torch.float)
+        manittee_mbti_vector = torch.tensor([manittee['eiScore'], manittee['snScore'], manittee['tfScore'], manittee['jpScore']], device=device, dtype=torch.float)
+        me_vibe_vector = torch.tensor(me['vibe_preference'], device=device, dtype=torch.float)
+        manittee_vibe_vector = torch.tensor(manittee['vibe_preference'], device=device, dtype=torch.float)
+        me_menu_vector = torch.tensor(me['menu_preference'], device=device, dtype=torch.float)
+        manittee_menu_vector = torch.tensor(manittee['menu_preference'], device=device, dtype=torch.float)
 
         average_loc = AverageLatLng(lat, lng, lat, lng)
         average_loc.loc_to_vec()
@@ -160,9 +152,12 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         food_recommender = RecommendPlace(
             model=mbti_model,
             embedding_model=embedding_model,
-            mbti_vector=mbti_avg_vector,
-            vibe_vector=vibe_pavg_vector,
-            menu_vector=menu_pavg_vector,
+            me_mbti_vector=me_mbti_vector,
+            manittee_mbti_vector=manittee_mbti_vector,
+            me_vibe_vector=me_vibe_vector,
+            manittee_vibe_vector=manittee_vibe_vector,
+            me_menu_vector=me_menu_vector,
+            manittee_menu_vector=manittee_menu_vector,
             chroma_client=chroma_client,
             review_col_name="review_collection",
             menu_col_name="menu_collection",
@@ -174,9 +169,12 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
         cafe_recommender = RecommendPlace(
             model=mbti_model,
             embedding_model=embedding_model,
-            mbti_vector=mbti_avg_vector,
-            vibe_vector=vibe_pavg_vector,
-            menu_vector=menu_pavg_vector,
+            me_mbti_vector=me_mbti_vector,
+            manittee_mbti_vector=manittee_mbti_vector,
+            me_vibe_vector=me_vibe_vector,
+            manittee_vibe_vector=manittee_vibe_vector,
+            me_menu_vector=me_menu_vector,
+            manittee_menu_vector=manittee_menu_vector,
             chroma_client=chroma_client,
             review_col_name="review_collection",
             menu_col_name="menu_collection",
@@ -244,7 +242,13 @@ def process_pair(pair, week_index, chroma_client, embedding_model, mbti_model):
     except Exception as e:
         logger.error(f"[ERROR] user_id={pair.manitto_id}, manittee_id={pair.manittee_id} 추천 실패: {e}")
         
-# run_batch_recommendation 함수: 장소 추천 실행 함수
+def process_pair_safe(pair, week_index, chroma_client, embedding_model, mbti_model, failed_pairs):
+    try:
+        process_pair(pair, week_index, chroma_client, embedding_model, mbti_model)
+    except Exception as e:
+        logger.error(f"[ERROR] user_id={pair.manitto_id}, manittee_id={pair.manittee_id} 추천 실패: {e}")
+        failed_pairs.append(pair)
+
 def run_batch_recommendation():
     start_time = datetime.now()
     print(f"[START] 장소 추천 실행 시작: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
@@ -254,12 +258,32 @@ def run_batch_recommendation():
         pairs = db.query(Manittos).filter(Manittos.week == week_index).all()
     finally:
         db.close()
-        
-    for pair in pairs:
-        try:
-            process_pair(pair, week_index, chroma_client, embedding_model, mbti_model)
-        except Exception as e:
-            logger.error(f"[ERROR] 추천 처리 실패: {e}")
+
+    def run_and_collect_failures(pairs_to_run):
+        failed = []
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = {
+                executor.submit(process_pair_safe, pair, week_index, chroma_client, embedding_model, mbti_model, failed): pair
+                for pair in pairs_to_run
+            }
+            for future in as_completed(futures):
+                try:
+                    future.result()
+                except Exception as e:
+                    logger.error(f"[FATAL] 처리 중 예외 발생: {e}")
+        return failed
+
+    # 1차 실행
+    failed_once = run_and_collect_failures(pairs)
+
+    # 실패한 쌍 재시도
+    if failed_once:
+        logger.info(f"[RETRY] {len(failed_once)}건 재시도 중...")
+        failed_twice = run_and_collect_failures(failed_once)
+        if failed_twice:
+            logger.warning(f"[FAILED] 재시도 후에도 실패한 쌍 {len(failed_twice)}건:")
+            for pair in failed_twice:
+                logger.warning(f" - user_id={pair.manitto_id}, manittee_id={pair.manittee_id}")
 
     end_time = datetime.now()
     elapsed = end_time - start_time
